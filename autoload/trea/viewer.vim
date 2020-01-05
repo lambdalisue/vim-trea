@@ -25,6 +25,7 @@ function! trea#viewer#init(provider, ...) abort
   nnoremap <buffer><silent> <Plug>(trea-hidden-on) :<C-u>call trea#viewer#hidden_on()<CR>
   nnoremap <buffer><silent> <Plug>(trea-hidden-off) :<C-u>call trea#viewer#hidden_off()<CR>
   nnoremap <buffer><silent> <Plug>(trea-hidden-toggle) :<C-u>call trea#viewer#hidden_toggle()<CR>
+  nnoremap <buffer><silent> <Plug>(trea-filter) :<C-u>call <SID>map_filter()<CR>
 
   if !g:trea#viewer#disable_default_mappings
     nmap <buffer><nowait> <C-l> <Plug>(trea-redraw)
@@ -35,6 +36,7 @@ function! trea#viewer#init(provider, ...) abort
     nmap <buffer><nowait> - <Plug>(trea-mark-toggle)
     vmap <buffer><nowait> - <Plug>(trea-mark-toggle)
     nmap <buffer><nowait> ! <Plug>(trea-hidden-toggle)
+    nmap <buffer><nowait> f <Plug>(trea-filter)
   endif
 
   augroup trea_viewer_internal
@@ -63,6 +65,7 @@ function! trea#viewer#init(provider, ...) abort
         \ 'nodes': [root],
         \ 'marks': [],
         \ 'hidden': 0,
+        \ 'pattern': '',
         \}
   let winid = win_getid()
   return trea#viewer#expand(root, { 'winid': winid })
@@ -278,6 +281,19 @@ function! trea#viewer#hidden_toggle(...) abort
   endif
 endfunction
 
+function! trea#viewer#filter(pattern, ...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  if trea.pattern !=# a:pattern
+    let trea.pattern = a:pattern
+    return trea#viewer#reload(trea.root, options)
+  endif
+  return s:Promise.resolve()
+endfunction
+
 function! s:get_trea_or_fail(bufnr) abort
   let trea = getbufvar(a:bufnr, 'trea', v:null)
   if trea is# v:null
@@ -299,6 +315,12 @@ function! s:update_nodes(bufnr, nodes) abort
     let trea.nodes = filter(
           \ copy(a:nodes),
           \ { _, v -> !v.hidden || v.__status is# s:STATUS_EXPANDED },
+          \)
+  endif
+  if !empty(trea.pattern)
+    let trea.nodes = filter(
+          \ copy(a:nodes),
+          \ { _, v -> v.text =~ trea.pattern || v.__status is# s:STATUS_EXPANDED },
           \)
   endif
 endfunction
@@ -386,6 +408,21 @@ function! s:map_mark_toggle() abort
     return
   endif
   call trea#viewer#mark_toggle(node)
+endfunction
+
+function! s:map_filter() abort
+  let trea = s:get_trea_or_fail(bufnr('%'))
+  call inputsave()
+  try
+    let pattern = input(
+          \ "Please input a pattern: ",
+          \ trea.pattern,
+          \)
+    call trea#viewer#filter(pattern)
+        \.catch(function('trea#lib#message#error'))
+  finally
+    call inputrestore()
+  endtry
 endfunction
 
 function! s:BufReadCmd() abort
