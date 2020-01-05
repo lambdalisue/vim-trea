@@ -51,14 +51,6 @@ __status		*trea-develop-node.__status*
 	Note that developers should use |trea#node#status()| instead for
 	general purpose.
 
-__processing		*trea-develop-node.__processing*
-	An integer (0 or 1)to indicate wheter the node is processing.
-	With default renderer, all nodes which is processing are drawn with
-	spinning spinner.
-
-	Note that developers should use |trea#node#processing()| instead for
-	general purpose.
-
 __parent		*trea-develop-node.__parent*
 	A reference to it's parent node. The value of root node is |v:null|.
 

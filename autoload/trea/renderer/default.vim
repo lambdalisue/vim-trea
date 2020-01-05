@@ -25,7 +25,6 @@ function! s:renderer_render(nodes, marks) abort
         \ 'collapsed_symbol': g:trea#renderer#default#collapsed_symbol,
         \ 'marked_symbol': g:trea#renderer#default#marked_symbol,
         \ 'unmarked_symbol': g:trea#renderer#default#unmarked_symbol,
-        \ 'processing_suffix': ' ' . g:trea#lib#spinner#PLACEHOLDER,
         \}
   let base = len(a:nodes[0].key)
   return trea#lib#gradual#map(copy(a:nodes), { v, -> s:render_node(v, a:marks, base, options) })
@@ -50,12 +49,9 @@ function! s:render_node(node, marks, base, options) abort
   let prefix = index(a:marks, a:node.key) is# -1
         \ ? a:options.unmarked_symbol
         \ : a:options.marked_symbol
-  let suffix = a:node.__processing
-        \ ? a:options.processing_suffix
-        \ : ''
   let level = len(a:node.key) - a:base
   if level is# 0
-    return prefix . a:options.root_symbol . a:node.text . suffix
+    return prefix . a:options.root_symbol . a:node.text
   endif
   let leading = repeat(a:options.leading, level - 1)
   let symbol = a:node.branch
@@ -63,7 +59,7 @@ function! s:render_node(node, marks, base, options) abort
         \   ? a:options.collapsed_symbol
         \   : a:options.expanded_symbol
         \ : a:options.leaf_symbol
-  return prefix . leading . symbol . a:node.text . suffix
+  return prefix . leading . symbol . a:node.text
 endfunction
 
 call s:Config.config(expand('<sfile>:p'), {

@@ -11,3 +11,4 @@ Vim.Window.Selector
 Vim.Window.Cursor
 Async.Promise.Process
 Data.List.Chunker
+App.Spinner

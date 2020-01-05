@@ -88,13 +88,9 @@ function! trea#viewer#process(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  let a:node.__processing = 1
   return trea#viewer#redraw(options)
-        \.then({ -> trea#lib#spinner#start({ 'bufnr': bufnr }) })
-        \.then({ -> { -> s:Lambda.void(
-        \   trea#lib#spinner#stop({ 'bufnr': bufnr }),
-        \   s:Lambda.let(a:node, '__processing', 0),
-        \)}})
+        \.then({ -> trea#lib#spinner#start(bufnr) })
+        \.then({ -> { -> trea#lib#spinner#stop(bufnr) }})
 endfunction
 
 function! trea#viewer#redraw(...) abort

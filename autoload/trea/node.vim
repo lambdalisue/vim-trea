@@ -11,7 +11,6 @@ function! trea#node#new(node, ...) abort
         \ 'hidden': get(a:node, 'hidden', 0),
         \ '__parent': v:null,
         \ '__status': s:STATUS_COLLAPSED,
-        \ '__processing': 0,
         \})
   let node = extend(node, a:0 ? a:1 : {})
   return node
@@ -37,11 +36,6 @@ endfunction
 " NOTE: Use node.__status directly when performance is the matter
 function! trea#node#status(node) abort
   return a:node.__status
-endfunction
-
-" NOTE: Use node.__processing directly when performance is the matter
-function! trea#node#processing(node) abort
-  return a:node.__processing
 endfunction
 
 " NOTE: Use node.__parent directly when performance is the matter
