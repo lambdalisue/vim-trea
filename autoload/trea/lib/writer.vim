@@ -3,7 +3,6 @@ let s:Later = vital#trea#import('Async.Later')
 let s:Lambda = vital#trea#import('Lambda')
 let s:Chunker = vital#trea#import('Data.List.Chunker')
 let s:Promise = vital#trea#import('Async.Promise')
-let s:WindowCursor = vital#trea#import('Vim.Window.Cursor')
 
 function! trea#lib#writer#write(bufnr, content) abort
   let r = getbufvar(a:bufnr, 'trea_writer_resolver', v:null)
@@ -25,13 +24,11 @@ function! trea#lib#writer#replace(bufnr, content) abort
     return r.then({ -> trea#lib#writer#replace(a:bufnr, a:content) })
   endif
   let winid = bufwinid(a:bufnr)
-  let cursor = s:WindowCursor.get_cursor(winid)
   let s = len(a:content)
   let t = g:trea#lib#writer#threshold
   let c = s:Chunker.new(t, a:content)
   let p = s:Promise.new({ resolve -> s:write(a:bufnr, c, 0, resolve)})
         \.then({ -> s:deletebufline(a:bufnr, len(a:content) + 1, '$') })
-        \.then({ -> s:WindowCursor.set_cursor(winid, cursor) })
         \.finally({ -> setbufvar(a:bufnr, 'trea_writer_resolver', v:null) })
   call setbufvar(a:bufnr, 'trea_writer_resolver', p)
   return p
