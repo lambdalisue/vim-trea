@@ -102,34 +102,4 @@ highlight()		*trea-develop-renderer.highlight()*
 
 
 =============================================================================
-FUNCTION					*trea-develop-function*
-
-					*trea#lib#buffer#replace()*
-trea#lib#buffer#replace({bufnr}, {content})
-	Replace a content of the buffer specified by {bufnr} to {content}.
-	The {bufnr} is a buffer ID and {content} is a string list.
-
-					*trea#lib#message#debug()*
-trea#lib#message#debug(...)
-	Write debug message to |messages| with |Comment| highlight.
-	The function works only when |g:trea#debug| is TRUE.
-	Note that the message will be echoed when Vim is not busy.
-
-					*trea#lib#message#info()*
-trea#lib#message#info(...)
-	Write info message to |messages|.
-	Note that the message will be echoed when Vim is not busy.
-
-					*trea#lib#message#title()*
-trea#lib#message#title(...)
-	Write info message to |messages| with |Title| highlgiht.
-	Note that the message will be echoed when Vim is not busy.
-
-					*trea#lib#message#error()*
-trea#lib#message#error(...)
-	Write info message to |messages| with |Error| highlgiht.
-	Note that the message will be echoed when Vim is not busy.
-
-
-=============================================================================
 vim:tw=78:fo=tcq2mM:ts=8:ft=help:norl
