@@ -61,6 +61,7 @@ function! trea#viewer#init(provider, ...) abort
         \ 'provider': a:provider,
         \ 'renderer': options.renderer,
         \ 'comparator': options.comparator,
+        \ 'processing': 0,
         \ 'root': root,
         \ 'nodes': [root],
         \ 'marks': [],
@@ -69,7 +70,7 @@ function! trea#viewer#init(provider, ...) abort
         \}
   let winid = win_getid()
   return trea#viewer#expand(root, { 'winid': winid })
-       \.then({ -> trea#viewer#reveal(options.reveal, { 'winid': winid }) })
+        \.then({ -> trea#viewer#reveal(options.reveal, { 'winid': winid }) })
 endfunction
 
 function! trea#viewer#node(lnum, ...) abort
@@ -82,7 +83,7 @@ function! trea#viewer#node(lnum, ...) abort
   return trea.nodes[index]
 endfunction
 
-function! trea#viewer#process(node, ...) abort
+function! trea#viewer#process(...) abort
   let options = extend({
         \ 'winid': win_getid(),
         \}, a:0 ? a:1 : {})
@@ -109,13 +110,18 @@ function! trea#viewer#reload(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
+  if trea.processing
+    return s:Promise.resolve()
+  endif
+  let trea.processing = 1
   let ns = {}
-  return trea#viewer#process(a:node, options)
+  return trea#viewer#process(options)
         \.then({ done -> s:Lambda.let(ns, 'done', done) })
         \.then({ -> trea#node#reload(a:node, trea.nodes, trea.provider, trea.comparator) })
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
+        \.finally({ -> s:Lambda.let(trea, 'processing', 0) })
 endfunction
 
 function! trea#viewer#expand(node, ...) abort
@@ -131,14 +137,20 @@ function! trea#viewer#expand(node, ...) abort
     " To improve UX, reload instead
     return trea#viewer#reload(a:node, options)
   endif
+  if trea.processing
+    return s:Promise.resolve()
+  endif
+  let trea.processing = 1
   let ns = {}
-  return trea#viewer#process(a:node, options)
+  let cursor = s:WindowCursor.get_cursor(options.winid)
+  return trea#viewer#process(options)
         \.then({ done -> s:Lambda.let(ns, 'done', done) })
         \.then({ -> trea#node#expand(a:node, trea.nodes, trea.provider, trea.comparator) })
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
-        \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid, "offset": 1 })})
+        \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid, 'previous': cursor, "offset": 1 })})
+        \.finally({ -> s:Lambda.let(trea, 'processing', 0) })
 endfunction
 
 function! trea#viewer#collapse(node, ...) abort
@@ -158,27 +170,42 @@ function! trea#viewer#collapse(node, ...) abort
     " To improve UX, reload instead
     return trea#viewer#reload(a:node, options)
   endif
+  if trea.processing
+    return s:Promise.resolve()
+  endif
+  let trea.processing = 1
   let ns = {}
-  return trea#viewer#process(a:node, options)
+  let cursor = s:WindowCursor.get_cursor(options.winid)
+  return trea#viewer#process(options)
         \.then({ done -> s:Lambda.let(ns, 'done', done) })
         \.then({ -> trea#node#collapse(a:node, trea.nodes, trea.provider) })
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
-        \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid })})
+        \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid, 'previous': cursor })})
+        \.finally({ -> s:Lambda.let(trea, 'processing', 0) })
 endfunction
 
 function! trea#viewer#reveal(key, ...) abort
   let options = extend({
         \ 'winid': win_getid(),
-        \ 'strict': 0,
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  return trea#node#reveal(a:key, trea.nodes, trea.provider, trea.comparator)
+  if trea.processing
+    return s:Promise.resolve()
+  endif
+  let trea.processing = 1
+  let ns = {}
+  let cursor = s:WindowCursor.get_cursor(options.winid)
+  return trea#viewer#process(options)
+        \.then({ done -> s:Lambda.let(ns, 'done', done) })
+        \.then({ -> trea#node#reveal(a:key, trea.nodes, trea.provider, trea.comparator) })
         \.then({ v -> s:update_nodes(bufnr, v) })
+        \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
-        \.then({ -> trea#viewer#cursor(a:key, { "winid": options.winid })})
+        \.then({ -> trea#viewer#cursor(a:key, { "winid": options.winid, 'previous': cursor })})
+        \.finally({ -> s:Lambda.let(trea, 'processing', 0) })
 endfunction
 
 function! trea#viewer#cursor(key, ...) abort
@@ -186,6 +213,7 @@ function! trea#viewer#cursor(key, ...) abort
         \ 'winid': win_getid(),
         \ 'offset': 0,
         \ 'strict': 0,
+        \ 'previous': v:null
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
@@ -197,10 +225,12 @@ function! trea#viewer#cursor(key, ...) abort
     return s:Promise.reject(printf('a node %s does not exist', a:key))
   endif
   let cursor = s:WindowCursor.get_cursor(options.winid)
-  call s:WindowCursor.set_cursor(
-        \ options.winid,
-        \ [index + 1 + options.offset, cursor[1]],
-        \)
+  if options.previous is# v:null || options.previous == cursor
+    call s:WindowCursor.set_cursor(
+          \ options.winid,
+          \ [index + 1 + options.offset, cursor[1]],
+          \)
+  endif
   return s:Promise.resolve()
 endfunction
 
