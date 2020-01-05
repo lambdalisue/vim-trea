@@ -50,7 +50,10 @@ function! trea#node#children(node, provider, ...) abort
   if !a:node.branch
     return s:Promise.reject('leaf node does not have children')
   elseif has_key(a:node, '__children') && options.cache
-    return s:Promise.resolve(a:node.__children)
+    return trea#lib#gradual#map(
+          \ a:node.__children,
+          \ { v -> extend(v, { '__status': s:STATUS_COLLAPSED }) },
+          \)
   elseif has_key(a:node, '__children_resolver')
     return a:node.__children_resolver
   endif
