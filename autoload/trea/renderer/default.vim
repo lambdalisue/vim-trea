@@ -28,7 +28,7 @@ function! s:renderer_render(nodes, marks) abort
         \ 'processing_suffix': ' ' . g:trea#lib#spinner#PLACEHOLDER,
         \}
   let base = len(a:nodes[0].key)
-  return map(copy(a:nodes), { -> s:render_node(v:val, a:marks, base, options) })
+  return trea#lib#gradual#map(copy(a:nodes), { v, -> s:render_node(v, a:marks, base, options) })
 endfunction
 
 function! s:renderer_syntax() abort

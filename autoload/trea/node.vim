@@ -61,7 +61,7 @@ function! trea#node#children(node, provider, ...) abort
     return a:node.__children_resolver
   endif
   let p = a:provider.get_children(a:node)
-        \.then(s:Lambda.map_f({ n -> trea#node#new(n, { '__parent': a:node }) }))
+        \.then(trea#lib#lambda#map_f({ n -> trea#node#new(n, { '__parent': a:node }) }))
         \.then({ v -> s:Lambda.pass(v, s:Lambda.let(a:node, '__children', v)) })
         \.finally({ -> s:Lambda.unlet(a:node, '__children_resolver') })
   let a:node.__children_resolver = p
@@ -82,21 +82,21 @@ function! trea#node#reload(node, nodes, provider, comparator) abort
   let n = len(k) - 1
   let K = n < 0 ? { v -> [] } : { v -> v.key[:n] }
   let outer = s:Promise.resolve(copy(a:nodes))
-        \.then(s:Lambda.filter_f({ v -> K(v) != k  }))
+        \.then(trea#lib#lambda#filter_f({ v -> K(v) != k  }))
   let inner = s:Promise.resolve(copy(a:nodes))
-        \.then(s:Lambda.filter_f({ v -> K(v) == k  }))
-        \.then(s:Lambda.filter_f({ v -> v.__status is# s:STATUS_EXPANDED }))
+        \.then(trea#lib#lambda#filter_f({ v -> K(v) == k  }))
+        \.then(trea#lib#lambda#filter_f({ v -> v.__status is# s:STATUS_EXPANDED }))
   let descendants = inner
         \.then({v -> copy(v)})
-        \.then(s:Lambda.map_f({ v ->
+        \.then(trea#lib#lambda#map_f({ v ->
         \   trea#node#children(v, a:provider, { 'cache': 0 }).then({ children ->
         \     s:Lambda.if(v.__status is# s:STATUS_EXPANDED, { -> children }, { -> []})
         \   })
         \ }))
         \.then({ v -> s:Promise.all(v) })
-        \.then(s:Lambda.reduce_f({ a, v -> a + v }, []))
+        \.then(trea#lib#lambda#reduce_f({ a, v -> a + v }, []))
   return s:Promise.all([outer, inner, descendants])
-        \.then(s:Lambda.reduce_f({ a, v -> a + v }, []))
+        \.then(trea#lib#lambda#reduce_f({ a, v -> a + v }, []))
         \.then({ v -> s:uniq(sort(v, a:comparator.compare)) })
 endfunction
 
@@ -131,7 +131,7 @@ function! trea#node#collapse(node, nodes, provider) abort
   let n = len(k) - 1
   let K = n < 0 ? { v -> [] } : { v -> v.key[:n] }
   let p = s:Promise.resolve(a:nodes)
-        \.then(s:Lambda.filter_f({ v -> v.key == k || K(v) != k  }))
+        \.then(trea#lib#lambda#filter_f({ v -> v.key == k || K(v) != k  }))
         \.finally({ -> s:Lambda.unlet(a:node, '__collapse_resolver') })
   call p.then({ -> s:Lambda.let(a:node, '__status', s:STATUS_COLLAPSED) })
   let a:node.__collapse_resolver = p

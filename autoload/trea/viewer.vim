@@ -89,14 +89,12 @@ function! trea#viewer#process(node, ...) abort
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
   let a:node.__processing = 1
-  call trea#viewer#redraw(options)
-  call trea#lib#spinner#start({
-        \ 'bufnr': bufnr,
-        \})
-  return { -> s:Lambda.void(
+  return trea#viewer#redraw(options)
+        \.then({ -> trea#lib#spinner#start({ 'bufnr': bufnr }) })
+        \.then({ -> { -> s:Lambda.void(
         \   trea#lib#spinner#stop({ 'bufnr': bufnr }),
         \   s:Lambda.let(a:node, '__processing', 0),
-        \)}
+        \)}})
 endfunction
 
 function! trea#viewer#redraw(...) abort
@@ -105,8 +103,8 @@ function! trea#viewer#redraw(...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  let content = trea.renderer.render(trea.nodes, trea.marks)
-  call trea#lib#buffer#replace(bufnr, content)
+  return trea.renderer.render(trea.nodes, trea.marks)
+        \.then({ v -> trea#lib#writer#replace(bufnr, v) })
 endfunction
 
 function! trea#viewer#reload(node, ...) abort
@@ -115,10 +113,12 @@ function! trea#viewer#reload(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  let Done = trea#viewer#process(a:node, options)
-  return trea#node#reload(a:node, trea.nodes, trea.provider, trea.comparator)
+  let ns = {}
+  return trea#viewer#process(a:node, options)
+        \.then({ done -> s:Lambda.let(ns, 'done', done) })
+        \.then({ -> trea#node#reload(a:node, trea.nodes, trea.provider, trea.comparator) })
         \.then({ v -> s:update_nodes(bufnr, v) })
-        \.then({ -> Done() })
+        \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
 endfunction
 
@@ -135,10 +135,12 @@ function! trea#viewer#expand(node, ...) abort
     " To improve UX, reload instead
     return trea#viewer#reload(a:node, options)
   endif
-  let Done = trea#viewer#process(a:node, options)
-  return trea#node#expand(a:node, trea.nodes, trea.provider, trea.comparator)
+  let ns = {}
+  return trea#viewer#process(a:node, options)
+        \.then({ done -> s:Lambda.let(ns, 'done', done) })
+        \.then({ -> trea#node#expand(a:node, trea.nodes, trea.provider, trea.comparator) })
         \.then({ v -> s:update_nodes(bufnr, v) })
-        \.then({ -> Done() })
+        \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
         \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid, "offset": 1 })})
 endfunction
@@ -160,10 +162,12 @@ function! trea#viewer#collapse(node, ...) abort
     " To improve UX, reload instead
     return trea#viewer#reload(a:node, options)
   endif
-  let Done = trea#viewer#process(a:node, options)
-  return trea#node#collapse(a:node, trea.nodes, trea.provider)
+  let ns = {}
+  return trea#viewer#process(a:node, options)
+        \.then({ done -> s:Lambda.let(ns, 'done', done) })
+        \.then({ -> trea#node#collapse(a:node, trea.nodes, trea.provider) })
         \.then({ v -> s:update_nodes(bufnr, v) })
-        \.then({ -> Done() })
+        \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
         \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid })})
 endfunction
@@ -212,8 +216,9 @@ function! trea#viewer#mark_on(node, ...) abort
   let trea = s:get_trea_or_fail(bufnr)
   if index(trea.marks, a:node.key) is# -1
     call add(trea.marks, a:node.key)
-    call trea#viewer#redraw(options)
+    return trea#viewer#redraw(options)
   endif
+  return s:Promise.resolve()
 endfunction
 
 function! trea#viewer#mark_off(node, ...) abort
@@ -225,8 +230,9 @@ function! trea#viewer#mark_off(node, ...) abort
   let index = index(trea.marks, a:node.key)
   if index isnot# -1
     call remove(trea.marks, index)
-    call trea#viewer#redraw(options)
+    return trea#viewer#redraw(options)
   endif
+  return s:Promise.resolve()
 endfunction
 
 function! trea#viewer#mark_toggle(node, ...) abort
@@ -309,24 +315,22 @@ endfunction
 function! s:update_nodes(bufnr, nodes) abort
   let trea = s:get_trea_or_fail(a:bufnr)
   let trea.marks = []
-  if trea.hidden
-    let trea.nodes = copy(a:nodes)
-  else
-    let trea.nodes = filter(
-          \ copy(a:nodes),
-          \ { _, v -> !v.hidden || v.__status is# s:STATUS_EXPANDED },
-          \)
-  endif
-  if !empty(trea.pattern)
-    let trea.nodes = filter(
-          \ copy(a:nodes),
-          \ { _, v -> v.text =~ trea.pattern || v.__status is# s:STATUS_EXPANDED },
-          \)
-  endif
+  let trea.nodes = copy(a:nodes)
+  let Hidden = trea.hidden
+        \ ? { -> 1 }
+        \ : { v -> v.__status is# s:STATUS_EXPANDED || !v.hidden }
+  let Filter = empty(trea.pattern)
+        \ ? { -> 1 }
+        \ : { v -> v.__status is# s:STATUS_EXPANDED || v.text =~ trea.pattern }
+  return s:Promise.resolve(trea.nodes)
+        \.then({ ns -> trea#lib#gradual#filter(ns, Hidden) })
+        \.then({ ns -> trea#lib#gradual#filter(ns, Filter) })
+        \.then({ ns -> s:Lambda.let(trea, 'nodes', ns) })
 endfunction
 
 function! s:map_redraw() abort
   call trea#viewer#redraw()
+        \.catch(function('trea#lib#message#error'))
 endfunction
 
 function! s:map_reload() abort
@@ -427,11 +431,12 @@ endfunction
 
 function! s:BufReadCmd() abort
   let trea = s:get_trea_or_fail(bufnr('%'))
+  let winid = win_getid()
   let cursor = get(b:, 'trea_cursor', getcurpos())
   call trea.renderer.syntax()
   call trea#viewer#redraw()
-  call setpos('.', cursor)
-  call trea#viewer#reload(trea.root)
+        \.then({ -> s:WindowCursor.set_cursor(winid, cursor[1:2]) })
+        \.then({ -> trea#viewer#reload(trea.root) })
         \.catch(function('trea#lib#message#error'))
 endfunction
 

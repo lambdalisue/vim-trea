@@ -63,8 +63,8 @@ if executable('ls')
     return s:Process.start(['ls', '-A', path])
           \.catch({ v -> v.stderr })
           \.then({ v -> v.stdout })
-          \.then(s:Lambda.filter_f({ v -> !empty(v) }))
-          \.then(s:Lambda.map_f({ v -> s:node(a:path . s:SEPARATOR . v) }))
+          \.then(trea#lib#lambda#filter_f({ v -> !empty(v) }))
+          \.then(trea#lib#lambda#map_f({ v -> s:node(a:path . s:SEPARATOR . v) }))
   endfunction
 endif
 
@@ -72,12 +72,12 @@ function! s:children_vim(path) abort
   let path = s:norm(a:path)
   let s = s:SEPARATOR
   let a = s:Promise.resolve(glob(path . s:SEPARATOR . '*', 1, 1, 1))
-        \.then(s:Lambda.map_f({ v -> s:node(v) }))
+        \.then(trea#lib#lambda#map_f({ v -> s:node(v) }))
   let b = s:Promise.resolve(glob(path . s:SEPARATOR . '.*', 1, 1, 1))
-        \.then(s:Lambda.filter_f({ v -> v[-2:] !=# s . '.' && v[-3:] !=# s . '..' }))
-        \.then(s:Lambda.map_f({ v -> s:node(v) }))
+        \.then(trea#lib#lambda#filter_f({ v -> v[-2:] !=# s . '.' && v[-3:] !=# s . '..' }))
+        \.then(trea#lib#lambda#map_f({ v -> s:node(v) }))
   return s:Promise.all([a, b])
-        \.then(s:Lambda.reduce_f({ a, v -> a + v }, []))
+        \.then(trea#lib#lambda#reduce_f({ a, v -> a + v }, []))
 endfunction
 
 function! s:children(path) abort

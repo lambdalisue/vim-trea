@@ -1,3 +1,5 @@
+let s:Lambda = vital#trea#import('Lambda')
+
 " NOTE:
 " Any characters of 's:frames' in a target buffer will be replaced
 " so use characters which are seldome used.
@@ -11,6 +13,7 @@ function! trea#lib#spinner#start(...) abort
         \ 'interval': 50,
         \}, a:0 ? a:1 : {})
   let spinner = getbufvar(options.bufnr, 'trea_spinner', {
+        \ 'processing': 0,
         \ 'timer': v:null,
         \ 'index': 0,
         \ 'ref_count': 0,
@@ -55,15 +58,23 @@ function! s:unregister(spinner, options) abort
 endfunction
 
 function! s:update_buffer(bufnr, spinner) abort
-  if bufwinnr(a:bufnr) is# -1
+  if bufwinnr(a:bufnr) is# -1 || a:spinner.processing
     " The buffer is not shown in window so skip
     return
   endif
-  let v = s:frames[a:spinner.index]
+  let frame = s:frames[a:spinner.index]
   let content = getbufline(a:bufnr, 1, '$')
-  call map(content, { -> substitute(v:val, s:frame_pattern, v, 'g') })
-  call trea#lib#buffer#replace(a:bufnr, content)
   let a:spinner.index = (a:spinner.index + 1) % s:frame_count
+  let a:spinner.processing = 1
+  call trea#lib#gradual#map(content, { v -> substitute(v, s:frame_pattern, frame, 'g') })
+        \.then({ v -> trea#lib#writer#replace(a:bufnr, v) })
+        \.finally({ -> s:Lambda.let(a:spinner, 'processing', 0) })
+  " call trea#lib#gradual#map(content, { v -> substitute(v, s:frame_pattern, frame, 'g') })
+  "      \.then({ content -> s:Lambda.void(
+  "      \   trea#lib#writer#setbufline(a:bufnr, 1, content),
+  "      \   trea#lib#writer#deletebufline(a:bufnr, len(content) + 1, '$'),
+  "      \ )})
+  "      \.finally({ -> s:Lambda.let(a:spinner, 'processing', 0) })
 endfunction
 
 
