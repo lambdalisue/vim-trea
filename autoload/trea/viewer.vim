@@ -11,17 +11,17 @@ function! trea#viewer#init(provider, ...) abort
   setlocal noswapfile nobuflisted nomodifiable
   setlocal filetype=trea
 
-  nnoremap <buffer><silent> <Plug>(trea-redraw) :<C-u>call <SID>map_redraw ()<CR><C-l>
+  nnoremap <buffer><silent> <Plug>(trea-redraw) :<C-u>call <SID>map_redraw()<CR><C-l>
   nnoremap <buffer><silent> <Plug>(trea-reload) :<C-u>call <SID>map_reload()<CR>
   nnoremap <buffer><silent> <Plug>(trea-expand) :<C-u>call <SID>map_expand()<CR>
   nnoremap <buffer><silent> <Plug>(trea-collapse) :<C-u>call <SID>map_collapse()<CR>
   nnoremap <buffer><silent> <Plug>(trea-reveal) :<C-u>call <SID>map_reveal()<CR>
-  nnoremap <buffer><silent> <Plug>(trea-mark) :<C-u>call <SID>map_mark()<CR>
-  nnoremap <buffer><silent> <Plug>(trea-unmark) :<C-u>call <SID>map_unmark()<CR>
-  nnoremap <buffer><silent> <Plug>(trea-toggle) :<C-u>call <SID>map_toggle()<CR>
-  vnoremap <buffer><silent> <Plug>(trea-mark) :call <SID>map_mark()<CR>
-  vnoremap <buffer><silent> <Plug>(trea-unmark) :call <SID>map_unmark()<CR>
-  vnoremap <buffer><silent> <Plug>(trea-toggle) :call <SID>map_toggle()<CR>
+  nnoremap <buffer><silent> <Plug>(trea-mark-on) :<C-u>call <SID>map_mark_on()<CR>
+  nnoremap <buffer><silent> <Plug>(trea-mark-off) :<C-u>call <SID>map_mark_off()<CR>
+  nnoremap <buffer><silent> <Plug>(trea-mark-toggle) :<C-u>call <SID>map_mark_toggle()<CR>
+  vnoremap <buffer><silent> <Plug>(trea-mark-on) :call <SID>map_mark_on()<CR>
+  vnoremap <buffer><silent> <Plug>(trea-mark-off) :call <SID>map_mark_off()<CR>
+  vnoremap <buffer><silent> <Plug>(trea-mark-toggle) :call <SID>map_mark_toggle()<CR>
 
   if !g:trea#viewer#disable_default_mappings
     nmap <buffer><nowait> <C-l> <Plug>(trea-redraw)
@@ -29,10 +29,8 @@ function! trea#viewer#init(provider, ...) abort
     nmap <buffer><nowait> l <Plug>(trea-expand)
     nmap <buffer><nowait> h <Plug>(trea-collapse)
     nmap <buffer><nowait> i <Plug>(trea-reveal)
-    nmap <buffer><nowait> - <Plug>(trea-toggle)
-    vmap <buffer><nowait> - <Plug>(trea-toggle)
-    nmap <buffer><nowait> <C-j> <Plug>(trea-toggle)j
-    nmap <buffer><nowait> <C-k> k<Plug>(trea-toggle)
+    nmap <buffer><nowait> - <Plug>(trea-mark-toggle)
+    vmap <buffer><nowait> - <Plug>(trea-mark-toggle)
   endif
 
   augroup trea_viewer_internal
@@ -162,44 +160,6 @@ function! trea#viewer#collapse(node, ...) abort
         \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid })})
 endfunction
 
-function! trea#viewer#mark(node, ...) abort
-  let options = extend({
-        \ 'winid': win_getid(),
-        \}, a:0 ? a:1 : {})
-  let bufnr = winbufnr(options.winid)
-  let trea = s:get_trea_or_fail(bufnr)
-  if index(trea.marks, a:node.key) is# -1
-    call add(trea.marks, a:node.key)
-    call trea#viewer#redraw(options)
-  endif
-endfunction
-
-function! trea#viewer#unmark(node, ...) abort
-  let options = extend({
-        \ 'winid': win_getid(),
-        \}, a:0 ? a:1 : {})
-  let bufnr = winbufnr(options.winid)
-  let trea = s:get_trea_or_fail(bufnr)
-  let index = index(trea.marks, a:node.key)
-  if index isnot# -1
-    call remove(trea.marks, index)
-    call trea#viewer#redraw(options)
-  endif
-endfunction
-
-function! trea#viewer#toggle(node, ...) abort
-  let options = extend({
-        \ 'winid': win_getid(),
-        \}, a:0 ? a:1 : {})
-  let bufnr = winbufnr(options.winid)
-  let trea = s:get_trea_or_fail(bufnr)
-  if index(trea.marks, a:node.key) is# -1
-    call trea#viewer#mark(a:node, options)
-  else
-    call trea#viewer#unmark(a:node, options)
-  endif
-endfunction
-
 function! trea#viewer#reveal(key, ...) abort
   let options = extend({
         \ 'winid': win_getid(),
@@ -234,6 +194,44 @@ function! trea#viewer#cursor(key, ...) abort
         \ [index + 1 + options.offset, cursor[1]],
         \)
   return s:Promise.resolve()
+endfunction
+
+function! trea#viewer#mark_on(node, ...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  if index(trea.marks, a:node.key) is# -1
+    call add(trea.marks, a:node.key)
+    call trea#viewer#redraw(options)
+  endif
+endfunction
+
+function! trea#viewer#mark_off(node, ...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  let index = index(trea.marks, a:node.key)
+  if index isnot# -1
+    call remove(trea.marks, index)
+    call trea#viewer#redraw(options)
+  endif
+endfunction
+
+function! trea#viewer#mark_toggle(node, ...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  if index(trea.marks, a:node.key) is# -1
+    call trea#viewer#mark_on(a:node, options)
+  else
+    call trea#viewer#mark_off(a:node, options)
+  endif
 endfunction
 
 function! s:get_trea_or_fail(bufnr) abort
@@ -288,33 +286,6 @@ function! s:map_collapse() abort
         \.catch(function('trea#lib#message#error'))
 endfunction
 
-function! s:map_mark() abort
-  let node = trea#viewer#node(line('.'))
-  if node is# v:null
-    call trea#lib#message#error("no node found on a cursor line")
-    return
-  endif
-  call trea#viewer#mark(node)
-endfunction
-
-function! s:map_unmark() abort
-  let node = trea#viewer#node(line('.'))
-  if node is# v:null
-    call trea#lib#message#error("no node found on a cursor line")
-    return
-  endif
-  call trea#viewer#unmark(node)
-endfunction
-
-function! s:map_toggle() abort
-  let node = trea#viewer#node(line('.'))
-  if node is# v:null
-    call trea#lib#message#error("no node found on a cursor line")
-    return
-  endif
-  call trea#viewer#toggle(node)
-endfunction
-
 function! s:map_reveal() abort
   let node = trea#viewer#node(line('.'))
   if node is# v:null
@@ -337,6 +308,33 @@ function! s:map_reveal() abort
   finally
     call inputrestore()
   endtry
+endfunction
+
+function! s:map_mark_on() abort
+  let node = trea#viewer#node(line('.'))
+  if node is# v:null
+    call trea#lib#message#error("no node found on a cursor line")
+    return
+  endif
+  call trea#viewer#mark_on(node)
+endfunction
+
+function! s:map_mark_off() abort
+  let node = trea#viewer#node(line('.'))
+  if node is# v:null
+    call trea#lib#message#error("no node found on a cursor line")
+    return
+  endif
+  call trea#viewer#mark_off(node)
+endfunction
+
+function! s:map_mark_toggle() abort
+  let node = trea#viewer#node(line('.'))
+  if node is# v:null
+    call trea#lib#message#error("no node found on a cursor line")
+    return
+  endif
+  call trea#viewer#mark_toggle(node)
 endfunction
 
 function! s:BufReadCmd() abort
