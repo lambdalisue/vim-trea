@@ -22,6 +22,9 @@ function! trea#viewer#init(provider, ...) abort
   vnoremap <buffer><silent> <Plug>(trea-mark-on) :call <SID>map_mark_on()<CR>
   vnoremap <buffer><silent> <Plug>(trea-mark-off) :call <SID>map_mark_off()<CR>
   vnoremap <buffer><silent> <Plug>(trea-mark-toggle) :call <SID>map_mark_toggle()<CR>
+  nnoremap <buffer><silent> <Plug>(trea-hidden-on) :<C-u>call trea#viewer#hidden_on()<CR>
+  nnoremap <buffer><silent> <Plug>(trea-hidden-off) :<C-u>call trea#viewer#hidden_off()<CR>
+  nnoremap <buffer><silent> <Plug>(trea-hidden-toggle) :<C-u>call trea#viewer#hidden_toggle()<CR>
 
   if !g:trea#viewer#disable_default_mappings
     nmap <buffer><nowait> <C-l> <Plug>(trea-redraw)
@@ -31,6 +34,7 @@ function! trea#viewer#init(provider, ...) abort
     nmap <buffer><nowait> i <Plug>(trea-reveal)
     nmap <buffer><nowait> - <Plug>(trea-mark-toggle)
     vmap <buffer><nowait> - <Plug>(trea-mark-toggle)
+    nmap <buffer><nowait> ! <Plug>(trea-hidden-toggle)
   endif
 
   augroup trea_viewer_internal
@@ -58,6 +62,7 @@ function! trea#viewer#init(provider, ...) abort
         \ 'root': root,
         \ 'nodes': [root],
         \ 'marks': [],
+        \ 'hidden': 0,
         \}
   let winid = win_getid()
   return trea#viewer#expand(root, { 'winid': winid })
@@ -234,6 +239,45 @@ function! trea#viewer#mark_toggle(node, ...) abort
   endif
 endfunction
 
+function! trea#viewer#hidden_on(...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  if !trea.hidden
+    let trea.hidden = 1
+    return trea#viewer#reload(trea.root, options)
+  endif
+  return s:Promise.resolve()
+endfunction
+
+function! trea#viewer#hidden_off(...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  if trea.hidden
+    let trea.hidden = 0
+    return trea#viewer#reload(trea.root, options)
+  endif
+  return s:Promise.resolve()
+endfunction
+
+function! trea#viewer#hidden_toggle(...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  if trea.hidden
+    return trea#viewer#hidden_off(options)
+  else
+    return trea#viewer#hidden_on(options)
+  endif
+endfunction
+
 function! s:get_trea_or_fail(bufnr) abort
   let trea = getbufvar(a:bufnr, 'trea', v:null)
   if trea is# v:null
@@ -248,8 +292,15 @@ endfunction
 
 function! s:update_nodes(bufnr, nodes) abort
   let trea = s:get_trea_or_fail(a:bufnr)
-  let trea.nodes = a:nodes
   let trea.marks = []
+  if trea.hidden
+    let trea.nodes = copy(a:nodes)
+  else
+    let trea.nodes = filter(
+          \ copy(a:nodes),
+          \ { _, v -> !v.hidden || v.__status is# s:STATUS_EXPANDED },
+          \)
+  endif
 endfunction
 
 function! s:map_redraw() abort

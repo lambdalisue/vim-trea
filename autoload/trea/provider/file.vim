@@ -46,9 +46,15 @@ function! s:node(path) abort
         \ 'key': s:provider_get_key(path),
         \ 'text': fnamemodify(path, ':t'),
         \ 'branch': isdirectory(path),
+        \ 'hidden': s:is_hidden(path),
         \ '_path': path,
         \}
   return node
+endfunction
+
+function! s:is_hidden(path) abort
+  let basename = fnamemodify(a:path, ':t')
+  return basename[:0] ==# '.'
 endfunction
 
 if executable('ls')

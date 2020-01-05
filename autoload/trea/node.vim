@@ -8,6 +8,7 @@ function! trea#node#new(node, ...) abort
   let text = get(a:node, 'text', get(a:node.key, -1, 'root node'))
   let node = extend(a:node, {
         \ 'text': text,
+        \ 'hidden': get(a:node, 'hidden', 0),
         \ '__parent': v:null,
         \ '__status': s:STATUS_COLLAPSED,
         \ '__processing': 0,
