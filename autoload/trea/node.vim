@@ -133,6 +133,9 @@ function! trea#node#collapse(node, nodes, provider) abort
 endfunction
 
 function! trea#node#reveal(key, nodes, provider, comparator) abort
+  if a:key == a:nodes[0].key
+    return s:Promise.resolve(a:nodes)
+  endif
   let n = len(a:nodes[0].key) - 1
   let k = copy(a:key)
   let ks = []
