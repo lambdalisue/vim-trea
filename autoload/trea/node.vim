@@ -71,6 +71,12 @@ endfunction
 function! trea#node#reload(node, nodes, provider, comparator) abort
   if a:node.__status is# s:STATUS_COLLAPSED
     return s:Promise.resolve(copy(a:nodes))
+  elseif has_key(a:node, '__collapse_resolver')
+    " XXX: No way to cancel so just return the resolver
+    return a:node.__collapse_resolver
+  elseif has_key(a:node, '__expand_resolver')
+    " XXX: No way to cancel so just return the resolver
+    return a:node.__expand_resolver
   endif
   let k = a:node.key
   let n = len(k) - 1
@@ -99,6 +105,9 @@ function! trea#node#expand(node, nodes, provider, comparator) abort
     return s:Promise.reject(printf('node %s is not collapsed', a:node.key))
   elseif has_key(a:node, '__expand_resolver')
     return a:node.__expand_resolver
+  elseif has_key(a:node, '__collapse_resolver')
+    " XXX: No way to cancel so just return the resolver
+    return a:node.__collapse_resolver
   endif
   let p = trea#node#children(a:node, a:provider)
         \.then({ v -> s:extend(a:node.key, a:nodes, v) })
@@ -114,6 +123,9 @@ function! trea#node#collapse(node, nodes, provider) abort
     return s:Promise.reject(printf('node %s is not expanded', a:node.key))
   elseif has_key(a:node, '__collapse_resolver')
     return a:node.__collapse_resolver
+  elseif has_key(a:node, '__expand_resolver')
+    " XXX: No way to cancel so just return the resolver
+    return a:node.__expand_resolver
   endif
   let k = a:node.key
   let n = len(k) - 1
