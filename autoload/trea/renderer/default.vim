@@ -1,4 +1,5 @@
 let s:Config = vital#trea#import('Config')
+let s:AsyncLambda = vital#trea#import('Async.Lambda')
 
 let s:STATUS_NONE = g:trea#node#STATUS_NONE
 let s:STATUS_COLLAPSED = g:trea#node#STATUS_COLLAPSED
@@ -28,7 +29,7 @@ function! s:renderer_render(nodes, marks) abort
         \ 'unmarked_symbol': g:trea#renderer#default#unmarked_symbol,
         \}
   let base = len(a:nodes[0].__key)
-  return trea#lib#gradual#map(copy(a:nodes), { v, -> s:render_node(v, a:marks, base, options) })
+  return s:AsyncLambda.map(copy(a:nodes), { v, -> s:render_node(v, a:marks, base, options) })
 endfunction
 
 function! s:renderer_syntax() abort

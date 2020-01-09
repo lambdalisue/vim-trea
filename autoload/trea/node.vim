@@ -1,5 +1,6 @@
 let s:Promise = vital#trea#import('Async.Promise')
 let s:Lambda = vital#trea#import('Lambda')
+let s:AsyncLambda = vital#trea#import('Async.Lambda')
 
 let s:STATUS_NONE = 0
 let s:STATUS_COLLAPSED = 1
@@ -51,7 +52,7 @@ function! trea#node#children(node, provider, ...) abort
   if a:node.status is# s:STATUS_NONE
     return s:Promise.reject('leaf node does not have children')
   elseif has_key(a:node, '__children') && options.cache
-    return trea#lib#gradual#map(
+    return s:AsyncLambda.map(
           \ a:node.__children,
           \ { v -> extend(v, { 'status': v.status > 0 }) },
           \)
@@ -59,7 +60,7 @@ function! trea#node#children(node, provider, ...) abort
     return a:node.__children_resolver
   endif
   let p = a:provider.get_children(a:node)
-        \.then(trea#lib#lambda#map_f({ n ->
+        \.then(s:AsyncLambda.map_f({ n ->
         \   trea#node#new(n, {
         \     '__key': a:node.__key + [n.name],
         \     '__parent': a:node,
@@ -83,21 +84,21 @@ function! trea#node#reload(node, nodes, provider, comparator) abort
   let n = len(k) - 1
   let K = n < 0 ? { v -> [] } : { v -> v.__key[:n] }
   let outer = s:Promise.resolve(copy(a:nodes))
-        \.then(trea#lib#lambda#filter_f({ v -> K(v) != k  }))
+        \.then(s:AsyncLambda.filter_f({ v -> K(v) != k  }))
   let inner = s:Promise.resolve(copy(a:nodes))
-        \.then(trea#lib#lambda#filter_f({ v -> K(v) == k  }))
-        \.then(trea#lib#lambda#filter_f({ v -> v.status is# s:STATUS_EXPANDED }))
+        \.then(s:AsyncLambda.filter_f({ v -> K(v) == k  }))
+        \.then(s:AsyncLambda.filter_f({ v -> v.status is# s:STATUS_EXPANDED }))
   let descendants = inner
         \.then({v -> copy(v)})
-        \.then(trea#lib#lambda#map_f({ v ->
+        \.then(s:AsyncLambda.map_f({ v ->
         \   trea#node#children(v, a:provider, { 'cache': 0 }).then({ children ->
         \     s:Lambda.if(v.status is# s:STATUS_EXPANDED, { -> children }, { -> []})
         \   })
         \ }))
         \.then({ v -> s:Promise.all(v) })
-        \.then(trea#lib#lambda#reduce_f({ a, v -> a + v }, []))
+        \.then(s:AsyncLambda.reduce_f({ a, v -> a + v }, []))
   return s:Promise.all([outer, inner, descendants])
-        \.then(trea#lib#lambda#reduce_f({ a, v -> a + v }, []))
+        \.then(s:AsyncLambda.reduce_f({ a, v -> a + v }, []))
         \.then({ v -> s:uniq(sort(v, a:comparator.compare)) })
 endfunction
 
@@ -130,7 +131,7 @@ function! trea#node#collapse(node, nodes, provider) abort
   let n = len(k) - 1
   let K = n < 0 ? { v -> [] } : { v -> v.__key[:n] }
   let p = s:Promise.resolve(a:nodes)
-        \.then(trea#lib#lambda#filter_f({ v -> v.__key == k || K(v) != k  }))
+        \.then(s:AsyncLambda.filter_f({ v -> v.__key == k || K(v) != k  }))
         \.finally({ -> s:Lambda.unlet(a:node, '__collapse_resolver') })
   call p.then({ -> s:Lambda.let(a:node, 'status', s:STATUS_COLLAPSED) })
   let a:node.__collapse_resolver = p

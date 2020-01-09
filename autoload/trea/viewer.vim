@@ -1,5 +1,6 @@
 let s:Config = vital#trea#import('Config')
 let s:Lambda = vital#trea#import('Lambda')
+let s:AsyncLambda = vital#trea#import('Async.Lambda')
 let s:Promise = vital#trea#import('Async.Promise')
 let s:WindowCursor = vital#trea#import('Vim.Window.Cursor')
 
@@ -355,8 +356,8 @@ function! s:update_nodes(bufnr, nodes) abort
         \ ? { -> 1 }
         \ : { v -> v.status is# s:STATUS_EXPANDED || v.name =~ trea.pattern }
   return s:Promise.resolve(trea.nodes)
-        \.then({ ns -> trea#lib#gradual#filter(ns, Hidden) })
-        \.then({ ns -> trea#lib#gradual#filter(ns, Filter) })
+        \.then({ ns -> s:AsyncLambda.filter(ns, Hidden) })
+        \.then({ ns -> s:AsyncLambda.filter(ns, Filter) })
         \.then({ ns -> s:Lambda.let(trea, 'nodes', ns) })
 endfunction
 
