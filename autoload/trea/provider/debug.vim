@@ -1,121 +1,129 @@
 let s:Promise = vital#trea#import('Async.Promise')
 
 function! trea#provider#debug#new(...) abort
+  let tree = a:0 ? a:1 : s:tree
   return {
-        \ 'get_key': funcref('s:provider_get_key'),
-        \ 'get_uri': funcref('s:provider_get_uri'),
-        \ 'get_root' : funcref('s:provider_get_root'),
-        \ 'get_children' : funcref('s:provider_get_children'),
+        \ 'get_node' : funcref('s:provider_get_node', [tree]),
+        \ 'get_parent' : funcref('s:provider_get_parent', [tree]),
+        \ 'get_children' : funcref('s:provider_get_children', [tree]),
         \}
 endfunction
 
-function! s:provider_get_key(uri) abort
-  return split(a:uri, '/')
+function! s:sleep(ms) abort
+  return s:Promise.new({ resolve -> timer_start(a:ms, { -> resolve() }) })
 endfunction
 
-function! s:provider_get_uri(key) abort
-  return join(a:key, '/')
-endfunction
-
-function! s:provider_get_root() abort
-  return {
-        \ 'key': [],
-        \ 'text': 'root',
-        \ 'branch': 1,
-        \}
-endfunction
-
-function! s:provider_get_children(node) abort
-  if a:node.key == []
-    return s:Promise.resolve([
-          \ {
-          \   'key': ['narrow'],
-          \   'text': 'narrow',
-          \   'branch': 1,
-          \ },
-          \ {
-          \   'key': ['deep'],
-          \   'text': 'deep',
-          \   'branch': 1,
-          \ },
-          \ {
-          \   'key': ['heavy'],
-          \   'text': 'heavy',
-          \   'branch': 1,
-          \ },
-          \ {
-          \   'key': ['leaf'],
-          \   'text': 'leaf',
-          \   'branch': 0,
-          \ },
-          \])
-  elseif a:node.key == ['narrow']
-    return s:Promise.resolve([
-          \ {
-          \   'key': ['narrow', 'a'],
-          \   'text': 'a',
-          \   'branch': 0,
-          \ },
-          \ {
-          \   'key': ['narrow', 'b'],
-          \   'text': 'b',
-          \   'branch': 0,
-          \ },
-          \ {
-          \   'key': ['narrow', 'c'],
-          \   'text': 'c',
-          \   'branch': 0,
-          \ },
-          \])
-  elseif a:node.key == ['deep']
-    return s:Promise.resolve([
-          \ {
-          \   'key': ['deep', 'a'],
-          \   'text': 'a',
-          \   'branch': 1,
-          \ },
-          \])
-  elseif a:node.key == ['deep', 'a']
-    return s:Promise.resolve([
-          \ {
-          \   'key': ['deep', 'a', 'b'],
-          \   'text': 'b',
-          \   'branch': 1,
-          \ },
-          \])
-  elseif a:node.key == ['deep', 'a', 'b']
-    return s:Promise.resolve([
-          \ {
-          \   'key': ['deep', 'a', 'b', 'c'],
-          \   'text': 'c',
-          \   'branch': 0,
-          \ },
-          \])
-  elseif a:node.key == ['heavy']
-    function! s:heavy_children(resolve, reject) abort
-      call timer_start(3000, { -> a:resolve([
-            \ {
-            \   'key': ['heavy', 'a'],
-            \   'text': 'a',
-            \   'branch': 0,
-            \ },
-            \ {
-            \   'key': ['heavy', 'b'],
-            \   'text': 'b',
-            \   'branch': 0,
-            \ },
-            \ {
-            \   'key': ['heavy', 'c'],
-            \   'text': 'c',
-            \   'branch': 0,
-            \ },
-            \])})
-    endfunction
-    return s:Promise.new(funcref('s:heavy_children'))
-  else
-    return s:Promise.reject(printf(
-          \ 'unknown node %s has specified',
-          \ a:node.key,
-          \))
+function! s:get_entry(tree, uri) abort
+  let key = matchstr(a:uri, 'debug:///\zs.*')
+  if !has_key(a:tree, key)
+    return v:null
   endif
+  let entry = extend({'key': key}, a:tree[key])
+  return entry
 endfunction
+
+function! s:provider_get_node(tree, uri) abort
+  let entry = s:get_entry(a:tree, a:uri)
+  return {
+        \ 'name': get(split(entry.key, '/'), -1, 'root'),
+        \ 'status': has_key(entry, 'children'),
+        \ '_uri': a:uri,
+        \}
+endfunction
+
+function! s:provider_get_parent(tree, node) abort
+  let uri = matchstr(a:node._uri, '.*\ze/[^/]*$')
+  return s:provider_get_node(a:tree, uri)
+endfunction
+
+function! s:provider_get_children(tree, node) abort
+  let uri = a:node._uri
+  let entry = s:get_entry(a:tree, a:node._uri)
+  if !has_key(entry, 'children')
+    return s:Promise.reject(printf('no children exists for %s', entry.key))
+  endif
+  let base = split(uri, '/')
+  let children = s:Promise.all(map(
+        \ copy(entry.children),
+        \ { -> s:provider_get_node(a:tree, join(base + [v:val], '/')) },
+        \))
+  return s:sleep(get(entry, 'delay', 0)).then({ -> children })
+endfunction
+
+
+let s:tree = {
+      \ '': {
+      \   'parent': v:null,
+      \   'children': [
+      \     'shallow',
+      \     'deep',
+      \     'heavy',
+      \     'leaf',
+      \   ],
+      \ },
+      \ 'shallow': {
+      \   'parent': '',
+      \   'children': [
+      \     'alpha',
+      \     'beta',
+      \     'gamma',
+      \   ],
+      \ },
+      \ 'shallow/alpha': {
+      \   'parent': 'shallow',
+      \   'children': [],
+      \ },
+      \ 'shallow/beta': {
+      \   'parent': 'shallow',
+      \   'children': [],
+      \ },
+      \ 'shallow/gamma': {
+      \   'parent': 'shallow',
+      \ },
+      \ 'deep': {
+      \   'parent': '',
+      \   'children': [
+      \     'alpha',
+      \   ],
+      \ },
+      \ 'deep/alpha': {
+      \   'parent': 'deep',
+      \   'children': [
+      \     'beta',
+      \   ],
+      \ },
+      \ 'deep/alpha/beta': {
+      \   'parent': 'deep/alpha',
+      \   'children': [
+      \     'gamma',
+      \   ],
+      \ },
+      \ 'deep/alpha/beta/gamma': {
+      \   'parent': 'deep/alpha/beta',
+      \ },
+      \ 'heavy': {
+      \   'delay': 1000,
+      \   'parent': '',
+      \   'children': [
+      \     'alpha',
+      \     'beta',
+      \     'gamma',
+      \   ],
+      \ },
+      \ 'heavy/alpha': {
+      \   'delay': 2000,
+      \   'parent': 'heavy',
+      \   'children': [],
+      \ },
+      \ 'heavy/beta': {
+      \   'delay': 3000,
+      \   'parent': 'heavy',
+      \   'children': [],
+      \ },
+      \ 'heavy/gamma': {
+      \   'parent': 'heavy',
+      \ },
+      \ 'leaf': {
+      \   'parent': '',
+      \ },
+      \}

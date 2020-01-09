@@ -1,5 +1,6 @@
 let s:Config = vital#trea#import('Config')
 
+let s:STATUS_NONE = g:trea#node#STATUS_NONE
 let s:STATUS_COLLAPSED = g:trea#node#STATUS_COLLAPSED
 
 
@@ -26,7 +27,7 @@ function! s:renderer_render(nodes, marks) abort
         \ 'marked_symbol': g:trea#renderer#default#marked_symbol,
         \ 'unmarked_symbol': g:trea#renderer#default#unmarked_symbol,
         \}
-  let base = len(a:nodes[0].key)
+  let base = len(a:nodes[0].__key)
   return trea#lib#gradual#map(copy(a:nodes), { v, -> s:render_node(v, a:marks, base, options) })
 endfunction
 
@@ -46,20 +47,20 @@ function! s:renderer_highlight() abort
 endfunction
 
 function! s:render_node(node, marks, base, options) abort
-  let prefix = index(a:marks, a:node.key) is# -1
+  let prefix = index(a:marks, a:node.__key) is# -1
         \ ? a:options.unmarked_symbol
         \ : a:options.marked_symbol
-  let level = len(a:node.key) - a:base
+  let level = len(a:node.__key) - a:base
   if level is# 0
-    return prefix . a:options.root_symbol . a:node.text
+    return prefix . a:options.root_symbol . a:node.label
   endif
   let leading = repeat(a:options.leading, level - 1)
-  let symbol = a:node.branch
-        \ ? a:node.__status is# s:STATUS_COLLAPSED
+  let symbol = a:node.status is# s:STATUS_NONE
+        \ ? a:options.leaf_symbol
+        \ : a:node.status is# s:STATUS_COLLAPSED
         \   ? a:options.collapsed_symbol
         \   : a:options.expanded_symbol
-        \ : a:options.leaf_symbol
-  return prefix . leading . symbol . a:node.text
+  return prefix . leading . symbol . a:node.label
 endfunction
 
 call s:Config.config(expand('<sfile>:p'), {

@@ -3,10 +3,11 @@ let s:Lambda = vital#trea#import('Lambda')
 let s:Promise = vital#trea#import('Async.Promise')
 let s:WindowCursor = vital#trea#import('Vim.Window.Cursor')
 
+let s:STATUS_NONE = g:trea#node#STATUS_NONE
 let s:STATUS_COLLAPSED = g:trea#node#STATUS_COLLAPSED
 let s:STATUS_EXPANDED = g:trea#node#STATUS_EXPANDED
 
-function! trea#viewer#init(provider, ...) abort
+function! trea#viewer#init(uri, provider, ...) abort
   setlocal buftype=nofile bufhidden=unload
   setlocal noswapfile nobuflisted nomodifiable
   setlocal filetype=trea
@@ -37,8 +38,8 @@ function! trea#viewer#init(provider, ...) abort
     vmap <buffer><nowait> - <Plug>(trea-mark-toggle)
     nmap <buffer><nowait> ! <Plug>(trea-hidden-toggle)
     nmap <buffer><nowait> f <Plug>(trea-filter)
-  endif
 
+  endif
   augroup trea_viewer_internal
     autocmd! * <buffer>
     autocmd BufEnter <buffer> setlocal nobuflisted
@@ -47,11 +48,10 @@ function! trea#viewer#init(provider, ...) abort
     autocmd ColorScheme <buffer> call s:ColorScheme()
   augroup END
 
-  let root = trea#node#new(a:provider.get_root())
   let options = extend({
         \ 'renderer': trea#renderer#default#new(),
         \ 'comparator': trea#comparator#default#new(),
-        \ 'reveal': root.key,
+        \ 'reveal': [],
         \}, a:0 ? a:1 : {})
 
   call options.renderer.highlight()
@@ -62,15 +62,18 @@ function! trea#viewer#init(provider, ...) abort
         \ 'renderer': options.renderer,
         \ 'comparator': options.comparator,
         \ 'processing': 0,
-        \ 'root': root,
-        \ 'nodes': [root],
         \ 'marks': [],
         \ 'hidden': 0,
         \ 'pattern': '',
         \}
+  let trea = b:trea
   let winid = win_getid()
-  return trea#viewer#expand(root, { 'winid': winid })
+  return s:Promise.resolve(trea#node#new(a:provider.get_node(a:uri)))
+        \.then({ n -> s:Lambda.pass(n, s:Lambda.let(trea, 'root', n)) })
+        \.then({ n -> s:Lambda.pass(n, s:Lambda.let(trea, 'nodes', [n])) })
+        \.then({ n -> trea#viewer#expand(n, { 'winid': winid }) })
         \.then({ -> trea#viewer#reveal(options.reveal, { 'winid': winid }) })
+        \.catch(function('trea#lib#message#error'))
 endfunction
 
 function! trea#viewer#node(lnum, ...) abort
@@ -130,10 +133,10 @@ function! trea#viewer#expand(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  if !a:node.branch
+  if a:node.status is# s:STATUS_NONE
     " To improve UX, reload parent instead
     return trea#viewer#reload(trea#node#parent(a:node), options)
-  elseif trea#node#status(a:node) is# s:STATUS_EXPANDED
+  elseif a:node.status is# s:STATUS_EXPANDED
     " To improve UX, reload instead
     return trea#viewer#reload(a:node, options)
   endif
@@ -149,7 +152,7 @@ function! trea#viewer#expand(node, ...) abort
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
-        \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid, 'previous': cursor, "offset": 1 })})
+        \.then({ -> trea#viewer#cursor(trea#node#key(a:node), { "winid": options.winid, 'previous': cursor, "offset": 1 })})
         \.finally({ -> s:Lambda.let(trea, 'processing', 0) })
 endfunction
 
@@ -163,7 +166,7 @@ function! trea#viewer#collapse(node, ...) abort
   if a:node == trea.root
     " To improve UX, root node should NOT be collapsed and reload instead.
     return trea#viewer#reload(a:node, options)
-  elseif trea#node#status(a:node) is# s:STATUS_COLLAPSED
+  elseif a:node.status isnot# s:STATUS_EXPANDED
     if !options.strict && a:node != trea.root
       return trea#viewer#collapse(trea#node#parent(a:node), options)
     endif
@@ -182,7 +185,7 @@ function! trea#viewer#collapse(node, ...) abort
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
-        \.then({ -> trea#viewer#cursor(a:node.key, { "winid": options.winid, 'previous': cursor })})
+        \.then({ -> trea#viewer#cursor(trea#node#key(a:node), { "winid": options.winid, 'previous': cursor })})
         \.finally({ -> s:Lambda.let(trea, 'processing', 0) })
 endfunction
 
@@ -219,7 +222,7 @@ function! trea#viewer#cursor(key, ...) abort
   let trea = s:get_trea_or_fail(bufnr)
   let index = trea#node#index(a:key, trea.nodes)
   if index is# -1
-    if !options.strict && a:key != trea.root.key
+    if !options.strict && a:key != trea#node#key(trea.root)
       return trea#viewer#cursor(a:key[:-2], options)
     endif
     return s:Promise.reject(printf('a node %s does not exist', a:key))
@@ -240,8 +243,9 @@ function! trea#viewer#mark_on(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  if index(trea.marks, a:node.key) is# -1
-    call add(trea.marks, a:node.key)
+  let key = trea#node#key(a:node)
+  if index(trea.marks, key) is# -1
+    call add(trea.marks, key)
     return trea#viewer#redraw(options)
   endif
   return s:Promise.resolve()
@@ -253,7 +257,8 @@ function! trea#viewer#mark_off(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  let index = index(trea.marks, a:node.key)
+  let key = trea#node#key(a:node)
+  let index = index(trea.marks, key)
   if index isnot# -1
     call remove(trea.marks, index)
     return trea#viewer#redraw(options)
@@ -267,7 +272,8 @@ function! trea#viewer#mark_toggle(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  if index(trea.marks, a:node.key) is# -1
+  let key = trea#node#key(a:node)
+  if index(trea.marks, key) is# -1
     call trea#viewer#mark_on(a:node, options)
   else
     call trea#viewer#mark_off(a:node, options)
@@ -344,10 +350,10 @@ function! s:update_nodes(bufnr, nodes) abort
   let trea.nodes = copy(a:nodes)
   let Hidden = trea.hidden
         \ ? { -> 1 }
-        \ : { v -> v.__status is# s:STATUS_EXPANDED || !v.hidden }
+        \ : { v -> v.status is# s:STATUS_EXPANDED || !v.hidden }
   let Filter = empty(trea.pattern)
         \ ? { -> 1 }
-        \ : { v -> v.__status is# s:STATUS_EXPANDED || v.text =~ trea.pattern }
+        \ : { v -> v.status is# s:STATUS_EXPANDED || v.name =~ trea.pattern }
   return s:Promise.resolve(trea.nodes)
         \.then({ ns -> trea#lib#gradual#filter(ns, Hidden) })
         \.then({ ns -> trea#lib#gradual#filter(ns, Filter) })
@@ -398,15 +404,15 @@ function! s:map_reveal() abort
   let trea = s:get_trea_or_fail(bufnr('%'))
   call inputsave()
   try
-    let uri = input(
-          \ "Please input a URI to reveal: ",
-          \ trea.provider.get_uri(node.key),
+    let path = input(
+          \ "Please input a relative path to reveal: ",
+          \ join(trea#node#key(node), '/') . '/',
           \)
-    if empty(uri)
+    if empty(path)
       echo "Cancelled"
       return
     endif
-    call trea#viewer#reveal(trea.provider.get_key(uri))
+    call trea#viewer#reveal(split(path, '/'))
         \.catch(function('trea#lib#message#error'))
   finally
     call inputrestore()

@@ -1,16 +1,17 @@
 let s:Promise = vital#trea#import('Async.Promise')
 let s:Lambda = vital#trea#import('Lambda')
 
-let s:STATUS_COLLAPSED = 0
-let s:STATUS_EXPANDED = 1
+let s:STATUS_NONE = 0
+let s:STATUS_COLLAPSED = 1
+let s:STATUS_EXPANDED = 2
 
 function! trea#node#new(node, ...) abort
-  let text = get(a:node, 'text', get(a:node.key, -1, 'root node'))
+  let label = get(a:node, 'label', a:node.name)
   let node = extend(a:node, {
-        \ 'text': text,
+        \ 'label': label,
         \ 'hidden': get(a:node, 'hidden', 0),
+        \ '__key': [],
         \ '__parent': v:null,
-        \ '__status': s:STATUS_COLLAPSED,
         \})
   let node = extend(node, a:0 ? a:1 : {})
   return node
@@ -21,7 +22,7 @@ function! trea#node#index(key, nodes) abort
     throw 'trea: "key" must be a list'
   endif
   for index in range(len(a:nodes))
-    if a:nodes[index].key == a:key
+    if a:nodes[index].__key == a:key
       return index
     endif
   endfor
@@ -33,9 +34,9 @@ function! trea#node#find(key, nodes) abort
   return index is# -1 ? v:null : a:nodes[index]
 endfunction
 
-" NOTE: Use node.__status directly when performance is the matter
-function! trea#node#status(node) abort
-  return a:node.__status
+" NOTE: Use node.__key directly when performance is the matter
+function! trea#node#key(node) abort
+  return a:node.__key
 endfunction
 
 " NOTE: Use node.__parent directly when performance is the matter
@@ -47,18 +48,23 @@ function! trea#node#children(node, provider, ...) abort
   let options = extend({
         \ 'cache': 1,
         \}, a:0 ? a:1 : {})
-  if !a:node.branch
+  if a:node.status is# s:STATUS_NONE
     return s:Promise.reject('leaf node does not have children')
   elseif has_key(a:node, '__children') && options.cache
     return trea#lib#gradual#map(
           \ a:node.__children,
-          \ { v -> extend(v, { '__status': s:STATUS_COLLAPSED }) },
+          \ { v -> extend(v, { 'status': v.status > 0 }) },
           \)
   elseif has_key(a:node, '__children_resolver')
     return a:node.__children_resolver
   endif
   let p = a:provider.get_children(a:node)
-        \.then(trea#lib#lambda#map_f({ n -> trea#node#new(n, { '__parent': a:node }) }))
+        \.then(trea#lib#lambda#map_f({ n ->
+        \   trea#node#new(n, {
+        \     '__key': a:node.__key + [n.name],
+        \     '__parent': a:node,
+        \   })
+        \ }))
         \.then({ v -> s:Lambda.pass(v, s:Lambda.let(a:node, '__children', v)) })
         \.finally({ -> s:Lambda.unlet(a:node, '__children_resolver') })
   let a:node.__children_resolver = p
@@ -66,28 +72,26 @@ function! trea#node#children(node, provider, ...) abort
 endfunction
 
 function! trea#node#reload(node, nodes, provider, comparator) abort
-  if a:node.__status is# s:STATUS_COLLAPSED
+  if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_COLLAPSED
     return s:Promise.resolve(copy(a:nodes))
-  elseif has_key(a:node, '__collapse_resolver')
-    " XXX: No way to cancel so just return the resolver
-    return a:node.__collapse_resolver
   elseif has_key(a:node, '__expand_resolver')
-    " XXX: No way to cancel so just return the resolver
     return a:node.__expand_resolver
+  elseif has_key(a:node, '__collapse_resolver')
+    return a:node.__collapse_resolver
   endif
-  let k = a:node.key
+  let k = a:node.__key
   let n = len(k) - 1
-  let K = n < 0 ? { v -> [] } : { v -> v.key[:n] }
+  let K = n < 0 ? { v -> [] } : { v -> v.__key[:n] }
   let outer = s:Promise.resolve(copy(a:nodes))
         \.then(trea#lib#lambda#filter_f({ v -> K(v) != k  }))
   let inner = s:Promise.resolve(copy(a:nodes))
         \.then(trea#lib#lambda#filter_f({ v -> K(v) == k  }))
-        \.then(trea#lib#lambda#filter_f({ v -> v.__status is# s:STATUS_EXPANDED }))
+        \.then(trea#lib#lambda#filter_f({ v -> v.status is# s:STATUS_EXPANDED }))
   let descendants = inner
         \.then({v -> copy(v)})
         \.then(trea#lib#lambda#map_f({ v ->
         \   trea#node#children(v, a:provider, { 'cache': 0 }).then({ children ->
-        \     s:Lambda.if(v.__status is# s:STATUS_EXPANDED, { -> children }, { -> []})
+        \     s:Lambda.if(v.status is# s:STATUS_EXPANDED, { -> children }, { -> []})
         \   })
         \ }))
         \.then({ v -> s:Promise.all(v) })
@@ -98,48 +102,46 @@ function! trea#node#reload(node, nodes, provider, comparator) abort
 endfunction
 
 function! trea#node#expand(node, nodes, provider, comparator) abort
-  if a:node.__status isnot# s:STATUS_COLLAPSED
-    return s:Promise.reject(printf('node %s is not collapsed', a:node.key))
+  if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_EXPANDED
+    return s:Promise.resolve(copy(a:nodes))
   elseif has_key(a:node, '__expand_resolver')
     return a:node.__expand_resolver
   elseif has_key(a:node, '__collapse_resolver')
-    " XXX: No way to cancel so just return the resolver
     return a:node.__collapse_resolver
   endif
   let p = trea#node#children(a:node, a:provider)
-        \.then({ v -> s:extend(a:node.key, a:nodes, v) })
+        \.then({ v -> s:extend(a:node.__key, a:nodes, v) })
         \.then({ v -> s:uniq(sort(v, a:comparator.compare)) })
         \.finally({ -> s:Lambda.unlet(a:node, '__expand_resolver') })
-  call p.then({ -> s:Lambda.let(a:node, '__status', s:STATUS_EXPANDED) })
+  call p.then({ -> s:Lambda.let(a:node, 'status', s:STATUS_EXPANDED) })
   let a:node.__expand_resolver = p
   return p
 endfunction
 
 function! trea#node#collapse(node, nodes, provider) abort
-  if a:node.__status isnot# s:STATUS_EXPANDED
-    return s:Promise.reject(printf('node %s is not expanded', a:node.key))
+  if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_COLLAPSED
+    return s:Promise.resolve(copy(a:nodes))
+  elseif has_key(a:node, '__expand_resolver')
+    return a:node.__expand_resolver
   elseif has_key(a:node, '__collapse_resolver')
     return a:node.__collapse_resolver
-  elseif has_key(a:node, '__expand_resolver')
-    " XXX: No way to cancel so just return the resolver
-    return a:node.__expand_resolver
   endif
-  let k = a:node.key
+  let k = a:node.__key
   let n = len(k) - 1
-  let K = n < 0 ? { v -> [] } : { v -> v.key[:n] }
+  let K = n < 0 ? { v -> [] } : { v -> v.__key[:n] }
   let p = s:Promise.resolve(a:nodes)
-        \.then(trea#lib#lambda#filter_f({ v -> v.key == k || K(v) != k  }))
+        \.then(trea#lib#lambda#filter_f({ v -> v.__key == k || K(v) != k  }))
         \.finally({ -> s:Lambda.unlet(a:node, '__collapse_resolver') })
-  call p.then({ -> s:Lambda.let(a:node, '__status', s:STATUS_COLLAPSED) })
+  call p.then({ -> s:Lambda.let(a:node, 'status', s:STATUS_COLLAPSED) })
   let a:node.__collapse_resolver = p
   return p
 endfunction
 
 function! trea#node#reveal(key, nodes, provider, comparator) abort
-  if a:key == a:nodes[0].key
+  if a:key == a:nodes[0].__key
     return s:Promise.resolve(a:nodes)
   endif
-  let n = len(a:nodes[0].key) - 1
+  let n = len(a:nodes[0].__key) - 1
   let k = copy(a:key)
   let ks = []
   while len(k) - 1 > n
@@ -150,7 +152,7 @@ function! trea#node#reveal(key, nodes, provider, comparator) abort
 endfunction
 
 function! s:uniq(nodes) abort
-  return uniq(a:nodes, { a, b -> a.key != b.key })
+  return uniq(a:nodes, { a, b -> a.__key != b.__key })
 endfunction
 
 function! s:extend(key, nodes, new_nodes) abort
@@ -176,5 +178,6 @@ function! s:expand_recursively(keys, nodes, provider, comparator) abort
 endfunction
 
 
+let g:trea#node#STATUS_NONE = s:STATUS_NONE
 let g:trea#node#STATUS_COLLAPSED = s:STATUS_COLLAPSED
 let g:trea#node#STATUS_EXPANDED = s:STATUS_EXPANDED

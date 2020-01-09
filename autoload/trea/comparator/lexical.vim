@@ -3,8 +3,8 @@ function! trea#comparator#lexical#new() abort
 endfunction
 
 function! s:comparator_compare(n1, n2) abort
-  let k1 = a:n1.key
-  let k2 = a:n2.key
+  let k1 = a:n1.__key
+  let k2 = a:n2.__key
   let l1 = len(k1)
   let l2 = len(k2)
   for index in range(0, min([l1, l2]) - 1)
@@ -15,7 +15,7 @@ function! s:comparator_compare(n1, n2) abort
   endfor
   " Shorter first
   let r = s:compare(l1, l2)
-  return r is# 0 ? s:compare(!a:n1.__status, !a:n2.__status) : r
+  return r is# 0 ? s:compare(!a:n1.status, !a:n2.status) : r
 endfunction
 
 function! s:compare(i1, i2) abort
