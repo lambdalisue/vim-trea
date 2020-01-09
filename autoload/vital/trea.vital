@@ -12,3 +12,5 @@ Vim.Window.Cursor
 Async.Promise.Process
 Data.List.Chunker
 App.Spinner
+Async.Lambda
+Async.File

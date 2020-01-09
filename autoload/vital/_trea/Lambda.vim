@@ -21,7 +21,7 @@ endfunction
 function! s:unlet(object, key, ...) abort
   let force = a:0 ? a:1 : 0
   if (a:0 ? a:1 : 0) is# 1
-    unlet! a:object[a:key]
+    silent! unlet! a:object[a:key]
   else
     unlet a:object[a:key]
   endif
@@ -48,19 +48,22 @@ function! s:if(condition, true, ...) abort
 endfunction
 
 function! s:map(list, fn) abort
-  return map(a:list, { k, v -> a:fn(v, k) })
+  return map(copy(a:list), { k, v -> a:fn(v, k) })
 endfunction
 
 function! s:filter(list, fn) abort
-  return filter(a:list, { k, v -> a:fn(v, k) })
+  return filter(copy(a:list), { k, v -> a:fn(v, k) })
 endfunction
 
 function! s:reduce(list, fn, ...) abort
-  let accumulator = a:0 ? a:1 : remove(a:list, -1)
-  let index = a:0 ? 1 : 0
-  for value in a:list
-    let accumulator = a:fn(accumulator, value, index)
-    let index += 1
+  let accumulator = a:0 ? a:1 : a:list[0]
+  let offset = a:0 ? 0 : 1
+  for index in range(len(a:list) - offset)
+    let accumulator = a:fn(
+          \ accumulator,
+          \ a:list[offset + index],
+          \ offset + index,
+          \)
   endfor
   return accumulator
 endfunction
