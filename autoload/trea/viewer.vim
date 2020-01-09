@@ -3,6 +3,7 @@ let s:Lambda = vital#trea#import('Lambda')
 let s:AsyncLambda = vital#trea#import('Async.Lambda')
 let s:Promise = vital#trea#import('Async.Promise')
 let s:WindowCursor = vital#trea#import('Vim.Window.Cursor')
+let s:CancellationTokenSource = vital#trea#import('Async.CancellationTokenSource')
 
 let s:STATUS_NONE = g:trea#node#STATUS_NONE
 let s:STATUS_COLLAPSED = g:trea#node#STATUS_COLLAPSED
@@ -13,6 +14,7 @@ function! trea#viewer#init(uri, provider, ...) abort
   setlocal noswapfile nobuflisted nomodifiable
   setlocal filetype=trea
 
+  nnoremap <buffer><silent> <Plug>(trea-cancel) :<C-u>call trea#viewer#cancel()<CR>
   nnoremap <buffer><silent> <Plug>(trea-redraw) :<C-u>call <SID>map_redraw()<CR><C-l>
   nnoremap <buffer><silent> <Plug>(trea-reload) :<C-u>call <SID>map_reload()<CR>
   nnoremap <buffer><silent> <Plug>(trea-expand) :<C-u>call <SID>map_expand()<CR>
@@ -30,6 +32,7 @@ function! trea#viewer#init(uri, provider, ...) abort
   nnoremap <buffer><silent> <Plug>(trea-filter) :<C-u>call <SID>map_filter()<CR>
 
   if !g:trea#viewer#disable_default_mappings
+    nmap <buffer><nowait> <C-c> <Plug>(trea-cancel)
     nmap <buffer><nowait> <C-l> <Plug>(trea-redraw)
     nmap <buffer><nowait> <F5> <Plug>(trea-reload)
     nmap <buffer><nowait> l <Plug>(trea-expand)
@@ -59,6 +62,7 @@ function! trea#viewer#init(uri, provider, ...) abort
   call options.renderer.syntax()
 
   let b:trea = {
+        \ 'source': s:CancellationTokenSource.new(),
         \ 'provider': a:provider,
         \ 'renderer': options.renderer,
         \ 'comparator': options.comparator,
@@ -85,6 +89,16 @@ function! trea#viewer#node(lnum, ...) abort
     return v:null
   endif
   return trea.nodes[index]
+endfunction
+
+function! trea#viewer#cancel(...) abort
+  let options = extend({
+        \ 'winid': win_getid(),
+        \}, a:0 ? a:1 : {})
+  let bufnr = winbufnr(options.winid)
+  let trea = s:get_trea_or_fail(bufnr)
+  call trea.source.cancel()
+  let trea.source = s:CancellationTokenSource.new()
 endfunction
 
 function! trea#viewer#process(...) abort
@@ -119,9 +133,10 @@ function! trea#viewer#reload(node, ...) abort
   endif
   let trea.processing = 1
   let ns = {}
+  let token = trea.source.token
   return trea#viewer#process(options)
         \.then({ done -> s:Lambda.let(ns, 'done', done) })
-        \.then({ -> trea#node#reload(a:node, trea.nodes, trea.provider, trea.comparator) })
+        \.then({ -> trea#node#reload(a:node, trea.nodes, trea.provider, trea.comparator, token) })
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
@@ -146,10 +161,11 @@ function! trea#viewer#expand(node, ...) abort
   endif
   let trea.processing = 1
   let ns = {}
+  let token = trea.source.token
   let cursor = s:WindowCursor.get_cursor(options.winid)
   return trea#viewer#process(options)
         \.then({ done -> s:Lambda.let(ns, 'done', done) })
-        \.then({ -> trea#node#expand(a:node, trea.nodes, trea.provider, trea.comparator) })
+        \.then({ -> trea#node#expand(a:node, trea.nodes, trea.provider, trea.comparator, token) })
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
@@ -201,10 +217,11 @@ function! trea#viewer#reveal(key, ...) abort
   endif
   let trea.processing = 1
   let ns = {}
+  let token = trea.source.token
   let cursor = s:WindowCursor.get_cursor(options.winid)
   return trea#viewer#process(options)
         \.then({ done -> s:Lambda.let(ns, 'done', done) })
-        \.then({ -> trea#node#reveal(a:key, trea.nodes, trea.provider, trea.comparator) })
+        \.then({ -> trea#node#reveal(a:key, trea.nodes, trea.provider, trea.comparator, token) })
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })

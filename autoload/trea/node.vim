@@ -1,6 +1,7 @@
 let s:Promise = vital#trea#import('Async.Promise')
 let s:Lambda = vital#trea#import('Lambda')
 let s:AsyncLambda = vital#trea#import('Async.Lambda')
+let s:CancellationToken = vital#trea#import('Async.CancellationToken')
 
 let s:STATUS_NONE = 0
 let s:STATUS_COLLAPSED = 1
@@ -45,7 +46,7 @@ function! trea#node#parent(node) abort
   return a:node.__parent
 endfunction
 
-function! trea#node#children(node, provider, ...) abort
+function! trea#node#children(node, provider, token, ...) abort
   let options = extend({
         \ 'cache': 1,
         \}, a:0 ? a:1 : {})
@@ -59,7 +60,7 @@ function! trea#node#children(node, provider, ...) abort
   elseif has_key(a:node, '__children_resolver')
     return a:node.__children_resolver
   endif
-  let p = a:provider.get_children(a:node)
+  let p = a:provider.get_children(a:node, a:token)
         \.then(s:AsyncLambda.map_f({ n ->
         \   trea#node#new(n, {
         \     '__key': a:node.__key + [n.name],
@@ -72,7 +73,7 @@ function! trea#node#children(node, provider, ...) abort
   return p
 endfunction
 
-function! trea#node#reload(node, nodes, provider, comparator) abort
+function! trea#node#reload(node, nodes, provider, comparator, token) abort
   if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_COLLAPSED
     return s:Promise.resolve(copy(a:nodes))
   elseif has_key(a:node, '__expand_resolver')
@@ -91,7 +92,7 @@ function! trea#node#reload(node, nodes, provider, comparator) abort
   let descendants = inner
         \.then({v -> copy(v)})
         \.then(s:AsyncLambda.map_f({ v ->
-        \   trea#node#children(v, a:provider, { 'cache': 0 }).then({ children ->
+        \   trea#node#children(v, a:provider, a:token, { 'cache': 0 }).then({ children ->
         \     s:Lambda.if(v.status is# s:STATUS_EXPANDED, { -> children }, { -> []})
         \   })
         \ }))
@@ -102,7 +103,7 @@ function! trea#node#reload(node, nodes, provider, comparator) abort
         \.then({ v -> s:uniq(sort(v, a:comparator.compare)) })
 endfunction
 
-function! trea#node#expand(node, nodes, provider, comparator) abort
+function! trea#node#expand(node, nodes, provider, comparator, token) abort
   if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_EXPANDED
     return s:Promise.resolve(copy(a:nodes))
   elseif has_key(a:node, '__expand_resolver')
@@ -110,7 +111,7 @@ function! trea#node#expand(node, nodes, provider, comparator) abort
   elseif has_key(a:node, '__collapse_resolver')
     return a:node.__collapse_resolver
   endif
-  let p = trea#node#children(a:node, a:provider)
+  let p = trea#node#children(a:node, a:provider, a:token)
         \.then({ v -> s:extend(a:node.__key, a:nodes, v) })
         \.then({ v -> s:uniq(sort(v, a:comparator.compare)) })
         \.finally({ -> s:Lambda.unlet(a:node, '__expand_resolver') })
@@ -138,7 +139,7 @@ function! trea#node#collapse(node, nodes, provider) abort
   return p
 endfunction
 
-function! trea#node#reveal(key, nodes, provider, comparator) abort
+function! trea#node#reveal(key, nodes, provider, comparator, token) abort
   if a:key == a:nodes[0].__key
     return s:Promise.resolve(a:nodes)
   endif
@@ -149,7 +150,7 @@ function! trea#node#reveal(key, nodes, provider, comparator) abort
     call add(ks, copy(k))
     call remove(k, -1)
   endwhile
-  return s:expand_recursively(ks, a:nodes, a:provider, a:comparator)
+  return s:expand_recursively(ks, a:nodes, a:provider, a:comparator, token)
 endfunction
 
 function! s:uniq(nodes) abort
@@ -161,7 +162,7 @@ function! s:extend(key, nodes, new_nodes) abort
   return index is# -1 ? a:nodes : extend(a:nodes, a:new_nodes, index + 1)
 endfunction
 
-function! s:expand_recursively(keys, nodes, provider, comparator) abort
+function! s:expand_recursively(keys, nodes, provider, comparator, token) abort
   let node = trea#node#find(a:keys[-1], a:nodes)
   if node is# v:null
     return s:Promise.reject(printf(
@@ -169,11 +170,11 @@ function! s:expand_recursively(keys, nodes, provider, comparator) abort
           \ a:keys[-1],
           \))
   endif
-  return trea#node#expand(node, a:nodes, a:provider, a:comparator)
+  return trea#node#expand(node, a:nodes, a:provider, a:comparator, token)
         \.then({ v -> s:Lambda.pass(v, remove(a:keys, -1)) })
         \.then({ v -> s:Lambda.if(
         \   len(a:keys) > 1,
-        \   { -> s:expand_recursively(a:keys, v, a:provider, a:comparator) },
+        \   { -> s:expand_recursively(a:keys, v, a:provider, a:comparator, token) },
         \   { -> v },
         \ )})
 endfunction

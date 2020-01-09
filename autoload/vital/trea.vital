@@ -14,3 +14,4 @@ Data.List.Chunker
 App.Spinner
 Async.Lambda
 Async.File
+Async.CancellationTokenSource

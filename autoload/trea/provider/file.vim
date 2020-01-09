@@ -3,6 +3,7 @@ let s:Lambda = vital#trea#import('Lambda')
 let s:AsyncLambda = vital#trea#import('Async.Lambda')
 let s:Promise = vital#trea#import('Async.Promise')
 let s:Process = vital#trea#import('Async.Promise.Process')
+let s:CancellationToken = vital#trea#import('Async.CancellationToken')
 
 function! trea#provider#file#new() abort
   return {
@@ -16,7 +17,7 @@ function! s:provider_get_node(uri) abort
  return s:node(matchstr(a:uri, 'file://\zs.*'))
 endfunction
 
-function! s:provider_get_parent(node) abort
+function! s:provider_get_parent(node, ...) abort
   if a:node._path ==# '/'
     return v:null
   endif
@@ -24,11 +25,12 @@ function! s:provider_get_parent(node) abort
   return s:Promise.resolve(s:node(parent))
 endfunction
 
-function! s:provider_get_children(node) abort
+function! s:provider_get_children(node, ...) abort
+  let token = a:0 ? a:1 : s:CancellationToken.none
   if a:node.status is# 0
     return s:Promise.reject("no children exists for %s", a:node._path)
   endif
-  return s:children(a:node._path)
+  return s:children(a:node._path, token)
         \.then(s:AsyncLambda.map_f({ v -> s:node(v) }))
 endfunction
 
@@ -55,25 +57,25 @@ function! s:node(path) abort
 endfunction
 
 if executable('find')
-  function! s:children_find(path) abort
+  function! s:children_find(path, token) abort
     let path = s:norm(a:path)
-    return s:Process.start(['find', path, '-maxdepth', '1'])
+    return s:Process.start(['find', path, '-maxdepth', '1'], { 'token': a:token })
          \.then({ v -> v.stdout })
          \.then(s:AsyncLambda.filter_f({ v -> !empty(v) && v !=# path }))
   endfunction
 endif
 
 if executable('ls')
-  function! s:children_ls(path) abort
+  function! s:children_ls(path, token) abort
     let path = s:norm(a:path)
-    return s:Process.start(['ls', '-1A', path])
+    return s:Process.start(['ls', '-1A', path], { 'token': a:token })
          \.then({ v -> v.stdout })
          \.then(s:AsyncLambda.filter_f({ v -> !empty(v) }))
          \.then(s:AsyncLambda.map_f({ v -> path . '/' . v }))
   endfunction
 endif
 
-function! s:children_vim(path) abort
+function! s:children_vim(path, ...) abort
   let path = s:norm(a:path)
   let a = s:Promise.resolve(glob(path . '/*', 1, 1, 1))
   let b = s:Promise.resolve(glob(path . '/.*', 1, 1, 1))
@@ -82,8 +84,8 @@ function! s:children_vim(path) abort
         \.then(s:AsyncLambda.reduce_f({ a, v -> a + v }, []))
 endfunction
 
-function! s:children(path) abort
-  return call(printf('s:children_%s', g:trea#provider#file#impl), [a:path])
+function! s:children(path, token) abort
+  return call(printf('s:children_%s', g:trea#provider#file#impl), [a:path, a:token])
 endfunction
 
 

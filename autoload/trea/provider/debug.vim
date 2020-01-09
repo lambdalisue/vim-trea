@@ -31,12 +31,12 @@ function! s:provider_get_node(tree, uri) abort
         \}
 endfunction
 
-function! s:provider_get_parent(tree, node) abort
+function! s:provider_get_parent(tree, node, ...) abort
   let uri = matchstr(a:node._uri, '.*\ze/[^/]*$')
   return s:provider_get_node(a:tree, uri)
 endfunction
 
-function! s:provider_get_children(tree, node) abort
+function! s:provider_get_children(tree, node, ...) abort
   let uri = a:node._uri
   let entry = s:get_entry(a:tree, a:node._uri)
   if !has_key(entry, 'children')
