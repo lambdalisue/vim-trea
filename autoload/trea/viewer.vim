@@ -104,7 +104,7 @@ function! trea#viewer#redraw(...) abort
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
   return trea.renderer.render(trea.nodes, trea.marks)
-        \.then({ v -> trea#lib#writer#replace(bufnr, v) })
+        \.then({ v -> trea#lib#buffer#replace(bufnr, v) })
 endfunction
 
 function! trea#viewer#reload(node, ...) abort
