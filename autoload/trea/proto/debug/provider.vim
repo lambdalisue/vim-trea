@@ -1,6 +1,6 @@
 let s:Promise = vital#trea#import('Async.Promise')
 
-function! trea#provider#debug#new(...) abort
+function! trea#proto#debug#provider#new(...) abort
   let tree = a:0 ? a:1 : s:tree
   return {
         \ 'get_node' : funcref('s:provider_get_node', [tree]),

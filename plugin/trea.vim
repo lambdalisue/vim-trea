@@ -5,8 +5,8 @@ let g:trea_loaded = 1
 
 function! s:trea_test() abort
   vertical new trea://test
-  " let provider = trea#provider#debug#new()
-  let provider = trea#provider#file#new()
+  let provider = trea#proto#debug#provider#new()
+  let provider = trea#proto#file#provider#new()
   call trea#viewer#init("file:///", provider)
 endfunction
 

@@ -5,7 +5,7 @@ let s:Promise = vital#trea#import('Async.Promise')
 let s:Process = vital#trea#import('Async.Promise.Process')
 let s:CancellationToken = vital#trea#import('Async.CancellationToken')
 
-function! trea#provider#file#new() abort
+function! trea#proto#file#provider#new() abort
   return {
         \ 'get_node': funcref('s:provider_get_node'),
         \ 'get_parent' : funcref('s:provider_get_parent'),
@@ -85,10 +85,11 @@ function! s:children_vim(path, ...) abort
 endfunction
 
 function! s:children(path, token) abort
-  return call(printf('s:children_%s', g:trea#provider#file#impl), [a:path, a:token])
+  return call(printf('s:children_%s', g:trea#proto#file#provider#impl), [a:path, a:token])
 endfunction
 
 
 call s:Config.config(expand('<sfile>:p'), {
       \ 'impl': executable('find') ? 'find' : executable('ls') ? 'ls' : 'vim',
       \})
+
