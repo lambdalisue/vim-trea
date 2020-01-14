@@ -182,7 +182,7 @@ function! trea#node#reveal(key, nodes, provider, comparator, token) abort
     call add(ks, copy(k))
     call remove(k, -1)
   endwhile
-  return s:expand_recursively(ks, a:nodes, a:provider, a:comparator, token)
+  return s:expand_recursively(ks, a:nodes, a:provider, a:comparator, a:token)
 endfunction
 
 function! s:uniq(nodes) abort
@@ -202,11 +202,11 @@ function! s:expand_recursively(keys, nodes, provider, comparator, token) abort
           \ a:keys[-1],
           \))
   endif
-  return trea#node#expand(node, a:nodes, a:provider, a:comparator, token)
+  return trea#node#expand(node, a:nodes, a:provider, a:comparator, a:token)
         \.then({ v -> s:Lambda.pass(v, remove(a:keys, -1)) })
         \.then({ v -> s:Lambda.if(
         \   len(a:keys) > 1,
-        \   { -> s:expand_recursively(a:keys, v, a:provider, a:comparator, token) },
+        \   { -> s:expand_recursively(a:keys, v, a:provider, a:comparator, a:token) },
         \   { -> v },
         \ )})
 endfunction
