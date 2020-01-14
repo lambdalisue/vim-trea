@@ -104,8 +104,24 @@ function! trea#node#reload(node, nodes, provider, comparator, token) abort
 endfunction
 
 function! trea#node#expand(node, nodes, provider, comparator, token) abort
-  if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_EXPANDED
-    return s:Promise.resolve(copy(a:nodes))
+  if a:node.status is# s:STATUS_NONE
+    " To improve UX, reload parent instead
+    return trea#node#reload(
+          \ a:node.__parent,
+          \ a:nodes,
+          \ a:provider,
+          \ a:comparator,
+          \ a:token,
+          \)
+  elseif a:node.status is# s:STATUS_EXPANDED
+    " To improve UX, reload instead
+    return trea#node#reload(
+          \ a:node,
+          \ a:nodes,
+          \ a:provider,
+          \ a:comparator,
+          \ a:token,
+          \)
   elseif has_key(a:node, '__expand_resolver')
     return a:node.__expand_resolver
   elseif has_key(a:node, '__collapse_resolver')
@@ -120,9 +136,25 @@ function! trea#node#expand(node, nodes, provider, comparator, token) abort
   return p
 endfunction
 
-function! trea#node#collapse(node, nodes, provider) abort
-  if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_COLLAPSED
-    return s:Promise.resolve(copy(a:nodes))
+function! trea#node#collapse(node, nodes, provider, comparator, token) abort
+  if a:node == a:nodes[0]
+    " To improve UX, root node should NOT be collapsed and reload instead.
+    return trea#node#reload(
+          \ a:node,
+          \ a:nodes,
+          \ a:provider,
+          \ a:comparator,
+          \ a:token,
+          \)
+  elseif a:node.status isnot# s:STATUS_EXPANDED
+    " To improve UX, collapse a parent node instead
+    return trea#node#collapse(
+          \ trea#node#parent(a:node),
+          \ a:nodes,
+          \ a:provider,
+          \ a:comparator,
+          \ a:token,
+          \)
   elseif has_key(a:node, '__expand_resolver')
     return a:node.__expand_resolver
   elseif has_key(a:node, '__collapse_resolver')

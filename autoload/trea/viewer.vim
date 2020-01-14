@@ -149,13 +149,6 @@ function! trea#viewer#expand(node, ...) abort
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  if a:node.status is# s:STATUS_NONE
-    " To improve UX, reload parent instead
-    return trea#viewer#reload(trea#node#parent(a:node), options)
-  elseif a:node.status is# s:STATUS_EXPANDED
-    " To improve UX, reload instead
-    return trea#viewer#reload(a:node, options)
-  endif
   if trea.processing
     return s:Promise.resolve()
   endif
@@ -176,29 +169,19 @@ endfunction
 function! trea#viewer#collapse(node, ...) abort
   let options = extend({
         \ 'winid': win_getid(),
-        \ 'strict': 0,
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
-  if a:node == trea.root
-    " To improve UX, root node should NOT be collapsed and reload instead.
-    return trea#viewer#reload(a:node, options)
-  elseif a:node.status isnot# s:STATUS_EXPANDED
-    if !options.strict && a:node != trea.root
-      return trea#viewer#collapse(trea#node#parent(a:node), options)
-    endif
-    " To improve UX, reload instead
-    return trea#viewer#reload(a:node, options)
-  endif
   if trea.processing
     return s:Promise.resolve()
   endif
   let trea.processing = 1
   let ns = {}
+  let token = trea.source.token
   let cursor = s:WindowCursor.get_cursor(options.winid)
   return trea#viewer#process(options)
         \.then({ done -> s:Lambda.let(ns, 'done', done) })
-        \.then({ -> trea#node#collapse(a:node, trea.nodes, trea.provider) })
+        \.then({ -> trea#node#collapse(a:node, trea.nodes, trea.provider, trea.comparator, token) })
         \.then({ v -> s:update_nodes(bufnr, v) })
         \.then({ -> ns.done() })
         \.then({ -> trea#viewer#redraw(options) })
@@ -233,14 +216,13 @@ function! trea#viewer#cursor(key, ...) abort
   let options = extend({
         \ 'winid': win_getid(),
         \ 'offset': 0,
-        \ 'strict': 0,
         \ 'previous': v:null
         \}, a:0 ? a:1 : {})
   let bufnr = winbufnr(options.winid)
   let trea = s:get_trea_or_fail(bufnr)
   let index = trea#node#index(a:key, trea.nodes)
   if index is# -1
-    if !options.strict && a:key != trea#node#key(trea.root)
+    if a:key != trea#node#key(trea.root)
       return trea#viewer#cursor(a:key[:-2], options)
     endif
     return s:Promise.reject(printf('a node %s does not exist', a:key))
