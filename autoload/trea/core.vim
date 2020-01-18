@@ -262,7 +262,6 @@ function! s:ColorScheme() abort
 endfunction
 
 function! s:update_nodes(trea, nodes) abort
-  let a:trea.marks = []
   let a:trea.nodes = copy(a:nodes)
   let Hidden = a:trea.hidden
         \ ? { -> 1 }
@@ -273,7 +272,15 @@ function! s:update_nodes(trea, nodes) abort
   return s:Promise.resolve(a:trea.nodes)
         \.then({ ns -> s:AsyncLambda.filter(ns, Hidden) })
         \.then({ ns -> s:AsyncLambda.filter(ns, Filter) })
-        \.then({ ns -> s:Lambda.let(a:trea, 'nodes', ns) })
+        \.then({ ns -> s:Lambda.pass(ns, s:Lambda.let(a:trea, 'nodes', ns)) })
+        \.then({ -> s:update_marks(a:trea, a:trea.marks) })
+endfunction
+
+function! s:update_marks(trea, marks) abort
+  return s:Promise.resolve(a:trea.nodes)
+        \.then({ ns -> s:AsyncLambda.map(ns, { v -> v.__key }) })
+        \.then({ ks -> s:AsyncLambda.filter(a:marks, { v -> index(ks, v) isnot# -1 }) })
+        \.then({ ms -> s:Lambda.let(a:trea, 'marks', ms) })
 endfunction
 
 function! s:invoke(name) abort
