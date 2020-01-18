@@ -33,7 +33,12 @@ endfunction
 
 function! s:provider_get_parent(tree, node, ...) abort
   let uri = matchstr(a:node._uri, '.*\ze/[^/]*$')
-  return s:provider_get_node(a:tree, uri)
+  try
+    let node = s:provider_get_node(a:tree, uri)
+    return s:Promise.resolve(node)
+  catch
+    return s:Promise.reject(v:exception)
+  endtry
 endfunction
 
 function! s:provider_get_children(tree, node, ...) abort

@@ -19,7 +19,7 @@ endfunction
 
 function! s:provider_get_parent(node, ...) abort
   if a:node._path ==# '/'
-    return v:null
+    return s:Promise.reject("no parent node exists for the root")
   endif
   let parent = fnamemodify(a:node._path, ':h')
   return s:Promise.resolve(s:node(parent))
