@@ -14,6 +14,7 @@ function! trea#node#new(node, ...) abort
         \ 'hidden': get(a:node, 'hidden', 0),
         \ '__key': [],
         \ '__parent': v:null,
+        \ '__processing': 0,
         \})
   let node = extend(node, a:0 ? a:1 : {})
   return node
@@ -60,6 +61,7 @@ function! trea#node#children(node, provider, token, ...) abort
   elseif has_key(a:node, '__children_resolver')
     return a:node.__children_resolver
   endif
+  let a:node.__processing = 1
   let p = a:provider.get_children(a:node, a:token)
         \.then(s:AsyncLambda.map_f({ n ->
         \   trea#node#new(n, {
@@ -68,8 +70,9 @@ function! trea#node#children(node, provider, token, ...) abort
         \   })
         \ }))
         \.then({ v -> s:Lambda.pass(v, s:Lambda.let(a:node, '__children', v)) })
-        \.finally({ -> s:Lambda.unlet(a:node, '__children_resolver') })
+        \.finally({ -> s:Lambda.let(a:node, '__processing', 0) })
   let a:node.__children_resolver = p
+        \.finally({ -> s:Lambda.unlet(a:node, '__children_resolver') })
   return p
 endfunction
 
@@ -98,9 +101,11 @@ function! trea#node#reload(node, nodes, provider, comparator, token) abort
         \ }))
         \.then({ v -> s:Promise.all(v) })
         \.then(s:AsyncLambda.reduce_f({ a, v -> a + v }, []))
+  let a:node.__processing = 1
   return s:Promise.all([outer, inner, descendants])
         \.then(s:AsyncLambda.reduce_f({ a, v -> a + v }, []))
         \.then({ v -> s:uniq(sort(v, a:comparator.compare)) })
+        \.finally({ -> s:Lambda.let(a:node, '__processing', 0) })
 endfunction
 
 function! trea#node#expand(node, nodes, provider, comparator, token) abort
@@ -127,12 +132,14 @@ function! trea#node#expand(node, nodes, provider, comparator, token) abort
   elseif has_key(a:node, '__collapse_resolver')
     return a:node.__collapse_resolver
   endif
+  let a:node.__processing = 1
   let p = trea#node#children(a:node, a:provider, a:token)
         \.then({ v -> s:extend(a:node.__key, a:nodes, v) })
         \.then({ v -> s:uniq(sort(v, a:comparator.compare)) })
-        \.finally({ -> s:Lambda.unlet(a:node, '__expand_resolver') })
+        \.finally({ -> s:Lambda.let(a:node, '__processing', 0) })
   call p.then({ -> s:Lambda.let(a:node, 'status', s:STATUS_EXPANDED) })
   let a:node.__expand_resolver = p
+        \.finally({ -> s:Lambda.unlet(a:node, '__expand_resolver') })
   return p
 endfunction
 
@@ -163,11 +170,13 @@ function! trea#node#collapse(node, nodes, provider, comparator, token) abort
   let k = a:node.__key
   let n = len(k) - 1
   let K = n < 0 ? { v -> [] } : { v -> v.__key[:n] }
+  let a:node.__processing = 1
   let p = s:Promise.resolve(a:nodes)
         \.then(s:AsyncLambda.filter_f({ v -> v.__key == k || K(v) != k  }))
-        \.finally({ -> s:Lambda.unlet(a:node, '__collapse_resolver') })
+        \.finally({ -> s:Lambda.let(a:node, '__processing', 0) })
   call p.then({ -> s:Lambda.let(a:node, 'status', s:STATUS_COLLAPSED) })
   let a:node.__collapse_resolver = p
+        \.finally({ -> s:Lambda.unlet(a:node, '__collapse_resolver') })
   return p
 endfunction
 
