@@ -54,7 +54,6 @@ function! trea#core#init(uri, provider, ...) abort
 
   let options = extend({
         \ 'reveal': [],
-        \ 'renderer': trea#renderer#default#new(),
         \ 'comparator': trea#comparator#default#new(),
         \}, a:0 ? a:1 : {},
         \)
@@ -62,15 +61,14 @@ function! trea#core#init(uri, provider, ...) abort
         \ 'bufnr': bufnr('%'),
         \ 'source': s:CancellationTokenSource.new(),
         \ 'provider': a:provider,
-        \ 'renderer': options.renderer,
         \ 'comparator': options.comparator,
         \ 'marks': [],
         \ 'hidden': 0,
         \ 'pattern': '',
         \}
-  call options.renderer.highlight()
-  call options.renderer.syntax()
   call setbufvar(trea.bufnr, 'trea', trea)
+  call trea#renderer#highlight()
+  call trea#renderer#syntax()
 
   let root = trea#node#new(a:provider.get_node(a:uri))
   let trea.root = root
@@ -97,8 +95,7 @@ function! trea#core#node(trea, ...) abort
   else
     let lnum = a:1
   endif
-  let index = a:trea.renderer.index(lnum)
-  return get(a:trea.nodes, index, v:null)
+  return get(a:trea.nodes, lnum - 1, v:null)
 endfunction
 
 function! trea#core#cancel(trea) abort
@@ -108,7 +105,7 @@ function! trea#core#cancel(trea) abort
 endfunction
 
 function! trea#core#redraw(trea) abort
-  return a:trea.renderer.render(a:trea.nodes, a:trea.marks)
+  return trea#renderer#render(a:trea.nodes, a:trea.marks)
         \.then({ v -> trea#lib#buffer#replace(a:trea.bufnr, v) })
 endfunction
 
@@ -249,7 +246,7 @@ function! s:BufReadCmd() abort
   let trea = trea#core#get()
   let winid = win_getid()
   let cursor = get(b:, 'trea_cursor', getcurpos())
-  call trea.renderer.syntax()
+  call trea#renderer#syntax()
   call trea#core#redraw(trea)
         \.then({ -> s:WindowCursor.set_cursor(winid, cursor[1:2]) })
         \.then({ -> trea#core#reload(trea, trea.root) })
@@ -258,7 +255,7 @@ endfunction
 
 function! s:ColorScheme() abort
   let trea = trea#core#get()
-  call trea.renderer.highlight()
+  call trea#renderer#highlight()
 endfunction
 
 function! s:update_nodes(trea, nodes) abort

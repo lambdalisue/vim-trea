@@ -4,35 +4,21 @@ let s:AsyncLambda = vital#trea#import('Async.Lambda')
 let s:STATUS_NONE = g:trea#node#STATUS_NONE
 let s:STATUS_COLLAPSED = g:trea#node#STATUS_COLLAPSED
 
-
-function! trea#renderer#default#new() abort
-  return {
-        \ 'index': funcref('s:renderer_index'),
-        \ 'render': funcref('s:renderer_render'),
-        \ 'syntax': funcref('s:renderer_syntax'),
-        \ 'highlight': funcref('s:renderer_highlight'),
-        \}
-endfunction
-
-function! s:renderer_index(lnum) abort
-  return a:lnum - 1
-endfunction
-
-function! s:renderer_render(nodes, marks) abort
+function! trea#renderer#render(nodes, marks) abort
   let options = {
-        \ 'leading': g:trea#renderer#default#leading,
-        \ 'root_symbol': g:trea#renderer#default#root_symbol,
-        \ 'leaf_symbol': g:trea#renderer#default#leaf_symbol,
-        \ 'expanded_symbol': g:trea#renderer#default#expanded_symbol,
-        \ 'collapsed_symbol': g:trea#renderer#default#collapsed_symbol,
-        \ 'marked_symbol': g:trea#renderer#default#marked_symbol,
-        \ 'unmarked_symbol': g:trea#renderer#default#unmarked_symbol,
+        \ 'leading': g:trea#renderer#leading,
+        \ 'root_symbol': g:trea#renderer#root_symbol,
+        \ 'leaf_symbol': g:trea#renderer#leaf_symbol,
+        \ 'expanded_symbol': g:trea#renderer#expanded_symbol,
+        \ 'collapsed_symbol': g:trea#renderer#collapsed_symbol,
+        \ 'marked_symbol': g:trea#renderer#marked_symbol,
+        \ 'unmarked_symbol': g:trea#renderer#unmarked_symbol,
         \}
   let base = len(a:nodes[0].__key)
   return s:AsyncLambda.map(copy(a:nodes), { v, -> s:render_node(v, a:marks, base, options) })
 endfunction
 
-function! s:renderer_syntax() abort
+function! trea#renderer#syntax() abort
   syntax clear
   syntax match TreaRoot   /\%1l.*/
   syntax match TreaLeaf   /^\s*|  /
@@ -40,7 +26,7 @@ function! s:renderer_syntax() abort
   syntax match TreaMarked /^* .*/
 endfunction
 
-function! s:renderer_highlight() abort
+function! trea#renderer#highlight() abort
   highlight default link TreaRoot   Directory
   highlight default link TreaLeaf   Directory
   highlight default link TreaBranch Directory
