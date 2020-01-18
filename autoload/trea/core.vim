@@ -12,6 +12,7 @@ let s:STATUS_EXPANDED = g:trea#node#STATUS_EXPANDED
 function! trea#core#init(uri, provider, ...) abort
   setlocal buftype=nofile bufhidden=unload
   setlocal noswapfile nobuflisted nomodifiable
+  setlocal signcolumn=yes:1
   setlocal filetype=trea
 
   nnoremap <buffer><silent> <Plug>(trea-cancel)        :<C-u>call <SID>invoke('cancel')<CR>
@@ -67,6 +68,7 @@ function! trea#core#init(uri, provider, ...) abort
         \ 'pattern': '',
         \}
   call setbufvar(trea.bufnr, 'trea', trea)
+  call trea#spinner#start(trea.bufnr)
   call trea#renderer#highlight()
   call trea#renderer#syntax()
 

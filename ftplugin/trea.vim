@@ -3,6 +3,5 @@ if exists('b:did_ftplugin')
 endif
 let b:did_ftplugin = 1
 
-setlocal signcolumn=no
 setlocal cursorline
 setlocal nolist nowrap nospell
