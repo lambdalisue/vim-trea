@@ -47,7 +47,11 @@ function! s:node(path) abort
   let path = s:norm(a:path)
   let name = fnamemodify(path, ':t')
   let status = isdirectory(path)
+  let uri = status is# 1
+        \ ? printf('file://%s', path)
+        \ : path
   return {
+        \ 'uri': uri,
         \ 'name': name,
         \ 'label': name ==# '' ? '/' : name,
         \ 'status': status,

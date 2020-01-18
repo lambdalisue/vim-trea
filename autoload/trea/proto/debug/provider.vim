@@ -25,14 +25,14 @@ endfunction
 function! s:provider_get_node(tree, uri) abort
   let entry = s:get_entry(a:tree, a:uri)
   return {
+        \ 'uri': a:uri,
         \ 'name': get(split(entry.key, '/'), -1, 'root'),
         \ 'status': has_key(entry, 'children'),
-        \ '_uri': a:uri,
         \}
 endfunction
 
 function! s:provider_get_parent(tree, node, ...) abort
-  let uri = matchstr(a:node._uri, '.*\ze/[^/]*$')
+  let uri = matchstr(a:node.uri, '.*\ze/[^/]*$')
   try
     let node = s:provider_get_node(a:tree, uri)
     return s:Promise.resolve(node)
@@ -42,8 +42,8 @@ function! s:provider_get_parent(tree, node, ...) abort
 endfunction
 
 function! s:provider_get_children(tree, node, ...) abort
-  let uri = a:node._uri
-  let entry = s:get_entry(a:tree, a:node._uri)
+  let uri = a:node.uri
+  let entry = s:get_entry(a:tree, a:node.uri)
   if !has_key(entry, 'children')
     return s:Promise.reject(printf('no children exists for %s', entry.key))
   endif
