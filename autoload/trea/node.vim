@@ -13,7 +13,7 @@ function! trea#node#new(node, ...) abort
         \ 'label': label,
         \ 'hidden': get(a:node, 'hidden', 0),
         \ '__key': [],
-        \ '__parent': v:null,
+        \ '__owner': v:null,
         \ '__processing': 0,
         \})
   let node = extend(node, a:0 ? a:1 : {})
@@ -42,9 +42,27 @@ function! trea#node#key(node) abort
   return a:node.__key
 endfunction
 
-" NOTE: Use node.__parent directly when performance is the matter
-function! trea#node#parent(node) abort
-  return a:node.__parent
+function! trea#node#parent(node, provider, token, ...) abort
+  let options = extend({
+        \ 'cache': 1,
+        \}, a:0 ? a:1 : {})
+  if has_key(a:node, '__parent') && options.cache
+    return s:Promise.resolve(a:node.__parent)
+  elseif has_key(a:node, '__parent_resolver')
+    return a:node.__parent_resolver
+  endif
+  let a:node.__processing += 1
+  let p = a:provider.get_parent(a:node, a:token)
+        \.then({ n -> trea#node#new(n, {
+        \   '__key': [],
+        \   '__owner': v:null,
+        \ })
+        \})
+        \.then({ n -> s:Lambda.pass(n, s:Lambda.let(a:node, '__parent', n)) })
+        \.finally({ -> s:Lambda.let(a:node, '__processing', a:node.__processing - 1) })
+  let a:node.__parent_resolver = p
+        \.finally({ -> s:Lambda.unlet(a:node, '__parent_resolver') })
+  return p
 endfunction
 
 function! trea#node#children(node, provider, token, ...) abort
@@ -66,7 +84,7 @@ function! trea#node#children(node, provider, token, ...) abort
         \.then(s:AsyncLambda.map_f({ n ->
         \   trea#node#new(n, {
         \     '__key': a:node.__key + [n.name],
-        \     '__parent': a:node,
+        \     '__owner': a:node,
         \   })
         \ }))
         \.then({ v -> s:Lambda.pass(v, s:Lambda.let(a:node, '__children', v)) })
@@ -111,9 +129,9 @@ endfunction
 
 function! trea#node#expand(node, nodes, provider, comparator, token) abort
   if a:node.status is# s:STATUS_NONE
-    " To improve UX, reload parent instead
+    " To improve UX, reload owner instead
     return trea#node#reload(
-          \ a:node.__parent,
+          \ a:node.__owner,
           \ a:nodes,
           \ a:provider,
           \ a:comparator,
@@ -145,7 +163,7 @@ function! trea#node#expand(node, nodes, provider, comparator, token) abort
 endfunction
 
 function! trea#node#collapse(node, nodes, provider, comparator, token) abort
-  if a:node == a:nodes[0]
+  if a:node.__owner is# v:null
     " To improve UX, root node should NOT be collapsed and reload instead.
     return trea#node#reload(
           \ a:node,
@@ -155,9 +173,9 @@ function! trea#node#collapse(node, nodes, provider, comparator, token) abort
           \ a:token,
           \)
   elseif a:node.status isnot# s:STATUS_EXPANDED
-    " To improve UX, collapse a parent node instead
+    " To improve UX, collapse a owner node instead
     return trea#node#collapse(
-          \ trea#node#parent(a:node),
+          \ a:node.__owner,
           \ a:nodes,
           \ a:provider,
           \ a:comparator,
