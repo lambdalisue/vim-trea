@@ -209,9 +209,9 @@ endfunction
 function! trea#core#mark_toggle(trea, node) abort
   let key = trea#node#key(a:node)
   if index(a:trea.marks, key) is# -1
-    return trea#core#mark_on(a:node, options)
+    return trea#core#mark_on(a:trea, a:node)
   endif
-  return trea#core#mark_off(a:node, options)
+  return trea#core#mark_off(a:trea, a:node)
 endfunction
 
 function! trea#core#hidden_on(trea) abort
