@@ -21,6 +21,8 @@ function! trea#core#init(uri, provider, ...) abort
   nnoremap <buffer><silent> <Plug>(trea-expand)        :<C-u>call <SID>invoke('expand')<CR>
   nnoremap <buffer><silent> <Plug>(trea-collapse)      :<C-u>call <SID>invoke('collapse')<CR>
   nnoremap <buffer><silent> <Plug>(trea-reveal)        :<C-u>call <SID>invoke('reveal')<CR>
+  nnoremap <buffer><silent> <Plug>(trea-enter)         :<C-u>call <SID>invoke('enter')<CR>
+  nnoremap <buffer><silent> <Plug>(trea-leave)         :<C-u>call <SID>invoke('leave')<CR>
   nnoremap <buffer><silent> <Plug>(trea-mark-on)       :<C-u>call <SID>invoke('mark_on')<CR>
   nnoremap <buffer><silent> <Plug>(trea-mark-off)      :<C-u>call <SID>invoke('mark_off')<CR>
   nnoremap <buffer><silent> <Plug>(trea-mark-toggle)   :<C-u>call <SID>invoke('mark_toggle')<CR>
@@ -36,6 +38,8 @@ function! trea#core#init(uri, provider, ...) abort
     nmap <buffer><nowait> <C-c> <Plug>(trea-cancel)
     nmap <buffer><nowait> <C-l> <Plug>(trea-redraw)
     nmap <buffer><nowait> <F5> <Plug>(trea-reload)
+    nmap <buffer><nowait> <Return> <Plug>(trea-enter)
+    nmap <buffer><nowait> <Backspace> <Plug>(trea-leave)
     nmap <buffer><nowait> l <Plug>(trea-expand)
     nmap <buffer><nowait> h <Plug>(trea-collapse)
     nmap <buffer><nowait> i <Plug>(trea-reveal)
@@ -186,6 +190,25 @@ function! trea#core#reveal(trea, key) abort
         \.then({ -> trea#core#redraw(a:trea) })
 endfunction
 
+function! trea#core#enter(trea, node) abort
+  if a:node.status is# s:STATUS_NONE
+    return s:Promise.reject()
+  endif
+  return s:Promise.resolve(a:node)
+        \.then({ n -> s:enter(a:trea, n.uri) })
+endfunction
+
+function! trea#core#leave(trea) abort
+  return s:Promise.resolve(a:trea.root)
+        \.then({ root -> trea#node#parent(
+        \   root,
+        \   a:trea.provider,
+        \   a:trea.source.token,
+        \ )
+        \})
+        \.then({ n -> s:enter(a:trea, n.uri) })
+endfunction
+
 function! trea#core#mark_on(trea, node) abort
   let key = trea#node#key(a:node)
   if index(a:trea.marks, key) is# -1
@@ -282,6 +305,13 @@ function! s:update_marks(trea, marks) abort
         \.then({ ms -> s:Lambda.let(a:trea, 'marks', ms) })
 endfunction
 
+function! s:enter(trea, uri) abort
+  noautocmd execute printf('edit trea://%s', a:uri)
+  return trea#core#init(a:uri, a:trea.provider, {
+        \ 'comparator': a:trea.comparator,
+        \})
+endfunction
+
 function! s:invoke(name) abort
   let trea = trea#core#get()
   if trea is# v:null
@@ -368,6 +398,18 @@ function! s:map_reveal(trea) abort
   finally
     call inputrestore()
   endtry
+endfunction
+
+function! s:map_enter(trea) abort
+  let node = trea#core#node(a:trea)
+  if node is# v:null
+    return s:Promise.reject("no node found on a cursor line")
+  endif
+  return trea#core#enter(a:trea, node)
+endfunction
+
+function! s:map_leave(trea) abort
+  return trea#core#leave(a:trea)
 endfunction
 
 function! s:map_mark_on(trea) abort
