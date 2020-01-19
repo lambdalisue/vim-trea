@@ -162,7 +162,7 @@ function! trea#core#enter(trea, node) abort
     return s:Promise.reject()
   endif
   return s:Promise.resolve(a:node)
-        \.then({ n -> s:enter(a:trea, n.uri) })
+        \.then({ n -> s:enter(a:trea, n) })
 endfunction
 
 function! trea#core#leave(trea) abort
@@ -173,7 +173,7 @@ function! trea#core#leave(trea) abort
         \   a:trea.source.token,
         \ )
         \})
-        \.then({ n -> s:enter(a:trea, n.uri) })
+        \.then({ n -> s:enter(a:trea, n) })
 endfunction
 
 function! trea#core#mark_on(trea, node) abort
@@ -272,9 +272,14 @@ function! s:update_marks(trea, marks) abort
         \.then({ ms -> s:Lambda.let(a:trea, 'marks', ms) })
 endfunction
 
-function! s:enter(trea, uri) abort
-  noautocmd execute printf('edit trea://%s', a:uri)
-  return trea#core#init(a:uri, a:trea.provider, {
+function! s:enter(trea, node) abort
+  if !has_key(a:node, 'bufname')
+    return s:Promise.reject('the node does not have bufname attribute')
+  endif
+  noautocmd execute printf('edit %s', a:node.bufname)
+  let uri = matchstr(a:node.bufname, 'trea://\zs.*')
+  let proto = matchstr(uri, '^.\{-}\ze://')
+  return trea#core#init(uri, trea#proto#{proto}#provider#new(), {
         \ 'comparator': a:trea.comparator,
         \})
 endfunction

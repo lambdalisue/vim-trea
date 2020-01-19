@@ -225,7 +225,7 @@ function! s:map_open(trea, opener) abort
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
-  return trea#lib#buffer#open(node.uri, {
+  return trea#lib#buffer#open(node.bufname, {
         \ 'opener': a:opener,
         \})
 endfunction

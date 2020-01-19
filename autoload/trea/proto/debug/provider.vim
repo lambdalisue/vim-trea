@@ -25,9 +25,9 @@ endfunction
 function! s:provider_get_node(tree, uri) abort
   let entry = s:get_entry(a:tree, a:uri)
   return {
-        \ 'uri': '/' . a:uri,
         \ 'name': get(split(entry.key, '/'), -1, 'root'),
         \ 'status': has_key(entry, 'children'),
+        \ 'bufname': 'trea://debug:///' . a:uri,
         \ '_uri': a:uri,
         \}
 endfunction
