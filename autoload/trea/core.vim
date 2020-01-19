@@ -291,9 +291,8 @@ function! s:enter(trea, node) abort
     return s:Promise.reject('the node does not have bufname attribute')
   endif
   noautocmd execute printf('edit %s', a:node.bufname)
-  let uri = matchstr(a:node.bufname, 'trea://\zs.*')
-  let proto = matchstr(uri, '^.\{-}\ze://')
-  return trea#core#init(uri, trea#proto#{proto}#provider#new(), {
+  let provider = trea#proto#provider_new(a:node.bufname)
+  return trea#core#init(uri, provider, {
         \ 'comparator': a:trea.comparator,
         \})
 endfunction

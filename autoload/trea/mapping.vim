@@ -57,6 +57,8 @@ function! trea#mapping#init() abort
     nmap <buffer><nowait> ! <Plug>(trea-hidden:toggle)
     nmap <buffer><nowait> f <Plug>(trea-filter)
   endif
+
+  call trea#proto#mapping_init()
 endfunction
 
 function! trea#mapping#is_branch() abort
