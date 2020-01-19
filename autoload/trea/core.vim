@@ -41,6 +41,7 @@ function! trea#core#init(uri, provider, ...) abort
   call trea#renderer#highlight()
   call trea#renderer#syntax()
   call trea#mapping#init()
+  call trea#lib#action#init('trea-')
 
   let root = trea#node#new(a:provider.get_node(a:uri))
   let trea.root = root
