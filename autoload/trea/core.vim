@@ -70,6 +70,21 @@ function! trea#core#get_cursor_node(trea) abort
   return trea#core#get_node(a:trea, info[0].lnum)
 endfunction
 
+function! trea#core#get_marked_nodes(trea) abort
+  let ms = a:trea.marks
+  return map(
+        \ copy(a:trea.nodes),
+        \ { _, v -> index(ms, v.__key) isnot# -1 },
+        \)
+endfunction
+
+function! trea#core#get_selected_nodes(trea) abort
+  if empty(a:trea.marks)
+    return [trea#core#get_cursor_node(a:trea)]
+  endif
+  return trea#core#get_marked_nodes(a:trea)
+endfunction
+
 function! trea#core#cancel(trea) abort
   call a:trea.source.cancel()
   let a:trea.source = s:CancellationTokenSource.new()
