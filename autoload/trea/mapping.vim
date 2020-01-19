@@ -65,7 +65,7 @@ function! trea#mapping#is_branch() abort
     call trea#lib#message#error("the buffer has not properly initialized")
     return
   endif
-  let node = trea#core#node(trea)
+  let node = trea#core#get_cursor_node(trea)
   if node is# v:null
     call trea#lib#message#error("no node found on a cursor line")
     return
@@ -92,7 +92,7 @@ function! s:map_redraw(trea) abort
 endfunction
 
 function! s:map_reload(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
@@ -100,7 +100,7 @@ function! s:map_reload(trea) abort
 endfunction
 
 function! s:map_expand(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
@@ -117,7 +117,7 @@ function! s:map_expand(trea) abort
 endfunction
 
 function! s:map_collapse(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
@@ -134,7 +134,7 @@ function! s:map_collapse(trea) abort
 endfunction
 
 function! s:map_reveal(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   let path = node is# v:null
         \ ? ''
         \ : join(trea#node#key(node), '/') . '/'
@@ -162,7 +162,7 @@ function! s:map_reveal(trea) abort
 endfunction
 
 function! s:map_enter(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
@@ -174,7 +174,7 @@ function! s:map_leave(trea) abort
 endfunction
 
 function! s:map_mark_on(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
@@ -182,7 +182,7 @@ function! s:map_mark_on(trea) abort
 endfunction
 
 function! s:map_mark_off(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
@@ -190,7 +190,7 @@ function! s:map_mark_off(trea) abort
 endfunction
 
 function! s:map_mark_toggle(trea) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif
@@ -221,7 +221,7 @@ function! s:map_filter(trea) abort
 endfunction
 
 function! s:map_open(trea, opener) abort
-  let node = trea#core#node(a:trea)
+  let node = trea#core#get_cursor_node(a:trea)
   if node is# v:null
     return s:Promise.reject("no node found on a cursor line")
   endif

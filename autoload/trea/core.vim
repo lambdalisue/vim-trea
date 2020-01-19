@@ -58,17 +58,16 @@ function! trea#core#get(...) abort
   return getbufvar(bufnr, 'trea', v:null)
 endfunction
 
-function! trea#core#node(trea, ...) abort
-  if a:0 is# 0
-    let info = getbufinfo(a:trea.bufnr)
-    if empty(info)
-      return v:null
-    endif
-    let lnum = info[0].lnum
-  else
-    let lnum = a:1
+function! trea#core#get_node(trea, lnum) abort
+  return get(a:trea.nodes, a:lnum - 1, v:null)
+endfunction
+
+function! trea#core#get_cursor_node(trea) abort
+  let info = getbufinfo(a:trea.bufnr)
+  if empty(info)
+    return v:null
   endif
-  return get(a:trea.nodes, lnum - 1, v:null)
+  return trea#core#get_node(a:trea, info[0].lnum)
 endfunction
 
 function! trea#core#cancel(trea) abort
