@@ -18,10 +18,7 @@ augroup trea_entry
 augroup END
 
 function! s:trea_test() abort
-  vertical new trea://test
-  let provider = trea#proto#debug#provider#new()
-  let provider = trea#proto#file#provider#new()
-  call trea#core#init("file:///", provider)
+  vertical new trea://file:///Users/alisue/
 endfunction
 
 command! -nargs=* -complete=dir TreaTest call s:trea_test()
