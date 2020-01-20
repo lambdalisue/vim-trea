@@ -75,7 +75,7 @@ endfunction
 
 function! trea#core#get_marked_nodes(trea) abort
   let ms = a:trea.marks
-  return map(
+  return filter(
         \ copy(a:trea.nodes),
         \ { _, v -> index(ms, v.__key) isnot# -1 },
         \)
