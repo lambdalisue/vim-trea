@@ -4,7 +4,6 @@ let s:varname = 'trea_action'
 function! trea#lib#action#init(prefix) abort
   let b:{s:varname} = {
         \ 'prefix': a:prefix,
-        \ 'actions': s:build_actions(a:prefix),
         \ 'previous': '',
         \}
   execute printf(
@@ -26,7 +25,8 @@ function! trea#lib#action#call(name) abort
   if action is# v:null
     throw printf('no variable %s found in the buffer', s:varname)
   endif
-  let expr = get(action.actions, a:name, v:null)
+  let actions = s:build_actions(action.prefix)
+  let expr = get(actions, a:name, v:null)
   if expr is# v:null
     throw printf('no action %s found in the buffer', a:name)
   endif
@@ -43,7 +43,7 @@ function! s:map_choice() abort
   try
     let n = get(function('s:complete_choice'), 'name')
     let r = input("action: ", '', printf('customlist,%s', n))
-    let names = sort(keys(action.actions))
+    let names = sort(keys(s:build_actions(action.prefix)))
     let name = get(filter(names, { -> v:val =~# '^' . r }), 0)
     if empty(name)
       return
@@ -83,7 +83,7 @@ function! s:complete_choice(arglead, cmdline, cursorpos) abort
   if action is# v:null
     throw printf('no variable %s found in the buffer', s:varname)
   endif
-  let names = sort(keys(action.actions))
+  let names = sort(keys(s:build_actions(action.prefix)))
   if empty(a:arglead)
     call filter(names, { -> v:val !~# ':' })
   endif
