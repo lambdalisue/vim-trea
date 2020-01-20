@@ -2,7 +2,7 @@ let s:Config = vital#trea#import('Config')
 let s:Promise = vital#trea#import('Async.Promise')
 let s:WindowCursor = vital#trea#import('Vim.Window.Cursor')
 
-function! trea#mapping#init() abort
+function! trea#internal#mapping#init() abort
   nnoremap <buffer><silent> <Plug>(trea-cancel)        :<C-u>call <SID>invoke('cancel')<CR>
   nnoremap <buffer><silent> <Plug>(trea-redraw)        :<C-u>call <SID>invoke('redraw')<CR>
   nnoremap <buffer><silent> <Plug>(trea-reload)        :<C-u>call <SID>invoke('reload')<CR>
@@ -35,15 +35,15 @@ function! trea#mapping#init() abort
   nnoremap <buffer><silent> <Plug>(trea-open:bottom)   :<C-u>call <SID>invoke('open', 'botright split')<CR>
   nnoremap <buffer><silent> <Plug>(trea-open:rightest) :<C-u>call <SID>invoke('open', 'botright vsplit')<CR>
 
-  nmap <buffer><silent><expr> <Plug>(trea-enter-or-open) trea#mapping#is_branch()
+  nmap <buffer><silent><expr> <Plug>(trea-enter-or-open) <SID>is_branch()
         \ ? "\<Plug>(trea-enter)"
         \ : "\<Plug>(trea-open)"
-  nmap <buffer><silent><expr> <Plug>(trea-expand-or-open) trea#mapping#is_branch()
+  nmap <buffer><silent><expr> <Plug>(trea-expand-or-open) <SID>is_branch()
         \ ? "\<Plug>(trea-expand)"
         \ : "\<Plug>(trea-open)"
   nmap <buffer><silent> <Plug>(trea-open) <Plug>(trea-open:edit)
 
-  if !g:trea#mapping#disable_default_mappings
+  if !g:trea#internal#mapping#disable_default_mappings
     nmap <buffer><nowait> <C-c> <Plug>(trea-cancel)
     nmap <buffer><nowait> <C-l> <Plug>(trea-redraw)
     nmap <buffer><nowait> <F5> <Plug>(trea-reload)
@@ -57,11 +57,9 @@ function! trea#mapping#init() abort
     nmap <buffer><nowait> ! <Plug>(trea-hidden:toggle)
     nmap <buffer><nowait> f <Plug>(trea-filter)
   endif
-
-  call trea#proto#mapping_init()
 endfunction
 
-function! trea#mapping#is_branch() abort
+function! s:is_branch() abort
   let trea = trea#core#get()
   if trea is# v:null
     call trea#lib#message#error("the buffer has not properly initialized")
@@ -112,7 +110,7 @@ function! s:map_expand(trea) abort
         \.then({ -> trea#core#cursor(
         \   winid,
         \   a:trea,
-        \   trea#node#key(node),
+        \   trea#internal#node#key(node),
         \   { 'previous': cursor, 'offset': 1 },
         \ )
         \})
@@ -129,7 +127,7 @@ function! s:map_collapse(trea) abort
         \.then({ -> trea#core#cursor(
         \   winid,
         \   a:trea,
-        \   trea#node#key(node),
+        \   trea#internal#node#key(node),
         \   { 'previous': cursor },
         \ )
         \})
@@ -139,7 +137,7 @@ function! s:map_reveal(trea) abort
   let node = trea#core#get_cursor_node(a:trea)
   let path = node is# v:null
         \ ? ''
-        \ : join(trea#node#key(node), '/') . '/'
+        \ : join(trea#internal#node#key(node), '/') . '/'
   call inputsave()
   try
     redraw

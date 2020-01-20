@@ -9,7 +9,7 @@ function! trea#proto#file#mapping#init() abort
 
   nmap <buffer> <Plug>(trea-cd) <Plug>(trea-cd:tcd)
 
-  if !g:trea#mapping#disable_default_mappings
+  if !g:trea#internal#mapping#disable_default_mappings
     nmap <buffer><nowait> x <Plug>(trea-open:system)
   endif
 endfunction

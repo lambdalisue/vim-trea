@@ -2,17 +2,19 @@ let s:Lambda = vital#trea#import('Lambda')
 let s:AsyncLambda = vital#trea#import('Async.Lambda')
 let s:Promise = vital#trea#import('Async.Promise')
 let s:WindowCursor = vital#trea#import('Vim.Window.Cursor')
-let s:CancellationTokenSource = vital#trea#import('Async.CancellationTokenSource')
 
-let s:STATUS_NONE = g:trea#node#STATUS_NONE
-let s:STATUS_COLLAPSED = g:trea#node#STATUS_COLLAPSED
-let s:STATUS_EXPANDED = g:trea#node#STATUS_EXPANDED
+let s:CancellationTokenSource = vital#trea#import('Async.CancellationTokenSource')
+let s:STATUS_NONE = g:trea#internal#node#STATUS_NONE
+let s:STATUS_COLLAPSED = g:trea#internal#node#STATUS_COLLAPSED
+let s:STATUS_EXPANDED = g:trea#internal#node#STATUS_EXPANDED
 
 function! trea#core#init(uri, provider, ...) abort
+  doautocmd <nomodeline> User TreaInitPre
   setlocal buftype=nofile bufhidden=unload
   setlocal noswapfile nobuflisted nomodifiable
   setlocal signcolumn=yes:1
   setlocal filetype=trea
+
 
   augroup trea_core_internal
     autocmd! * <buffer>
@@ -36,17 +38,18 @@ function! trea#core#init(uri, provider, ...) abort
         \ 'hidden': 0,
         \ 'pattern': '',
         \}
-  call setbufvar(trea.bufnr, 'trea', trea)
-  call trea#spinner#start(trea.bufnr)
-  call trea#renderer#highlight()
-  call trea#renderer#syntax()
-  call trea#mapping#init()
-  call trea#lib#action#init('trea-')
-
-  let root = trea#node#new(a:provider.get_node(a:uri))
+  let root = trea#internal#node#new(a:provider.get_node(a:uri))
   let trea.root = root
   let trea.nodes = [root]
   let b:trea = trea
+  doautocmd <nomodeline> User TreaInit
+
+  call trea#internal#spinner#start(trea.bufnr)
+  call trea#internal#renderer#highlight()
+  call trea#internal#renderer#syntax()
+  call trea#internal#mapping#init()
+  call trea#lib#action#init('trea-')
+  doautocmd <nomodeline> User TreaReady
 
   return s:Promise.resolve()
         \.then({ -> trea#core#expand(trea, trea.root) })
@@ -92,7 +95,7 @@ function! trea#core#cancel(trea) abort
 endfunction
 
 function! trea#core#redraw(trea) abort
-  return trea#renderer#render(a:trea.nodes, a:trea.marks)
+  return trea#internal#renderer#render(a:trea.nodes, a:trea.marks)
         \.then({ v -> trea#lib#buffer#replace(a:trea.bufnr, v) })
 endfunction
 
@@ -101,9 +104,9 @@ function! trea#core#cursor(winid, trea, key, ...) abort
         \ 'offset': 0,
         \ 'previous': v:null
         \}, a:0 ? a:1 : {})
-  let index = trea#node#index(a:key, a:trea.nodes)
+  let index = trea#internal#node#index(a:key, a:trea.nodes)
   if index is# -1
-    if a:key != trea#node#key(a:trea.root)
+    if a:key != trea#internal#node#key(a:trea.root)
       return trea#core#cursor(a:winid, a:trea, a:key[:-2], options)
     endif
     return s:Promise.reject(printf('a node %s does not exist', a:key))
@@ -117,7 +120,7 @@ endfunction
 
 function! trea#core#reload(trea, node) abort
   return s:Promise.resolve()
-        \.then({ -> trea#node#reload(
+        \.then({ -> trea#internal#node#reload(
         \   a:node,
         \   a:trea.nodes,
         \   a:trea.provider,
@@ -131,7 +134,7 @@ endfunction
 
 function! trea#core#expand(trea, node) abort
   return s:Promise.resolve()
-        \.then({ -> trea#node#expand(
+        \.then({ -> trea#internal#node#expand(
         \   a:node,
         \   a:trea.nodes,
         \   a:trea.provider,
@@ -145,7 +148,7 @@ endfunction
 
 function! trea#core#collapse(trea, node) abort
   return s:Promise.resolve()
-        \.then({ -> trea#node#collapse(
+        \.then({ -> trea#internal#node#collapse(
         \   a:node,
         \   a:trea.nodes,
         \   a:trea.provider,
@@ -159,7 +162,7 @@ endfunction
 
 function! trea#core#reveal(trea, key) abort
   return s:Promise.resolve()
-        \.then({ -> trea#node#reveal(
+        \.then({ -> trea#internal#node#reveal(
         \   a:key,
         \   a:trea.nodes,
         \   a:trea.provider,
@@ -181,7 +184,7 @@ endfunction
 
 function! trea#core#leave(trea) abort
   return s:Promise.resolve(a:trea.root)
-        \.then({ root -> trea#node#parent(
+        \.then({ root -> trea#internal#node#parent(
         \   root,
         \   a:trea.provider,
         \   a:trea.source.token,
@@ -191,7 +194,7 @@ function! trea#core#leave(trea) abort
 endfunction
 
 function! trea#core#mark_on(trea, node) abort
-  let key = trea#node#key(a:node)
+  let key = trea#internal#node#key(a:node)
   if index(a:trea.marks, key) is# -1
     call add(a:trea.marks, key)
     return trea#core#redraw(a:trea)
@@ -200,7 +203,7 @@ function! trea#core#mark_on(trea, node) abort
 endfunction
 
 function! trea#core#mark_off(trea, node) abort
-  let key = trea#node#key(a:node)
+  let key = trea#internal#node#key(a:node)
   let index = index(a:trea.marks, key)
   if index isnot# -1
     call remove(a:trea.marks, index)
@@ -210,7 +213,7 @@ function! trea#core#mark_off(trea, node) abort
 endfunction
 
 function! trea#core#mark_toggle(trea, node) abort
-  let key = trea#node#key(a:node)
+  let key = trea#internal#node#key(a:node)
   if index(a:trea.marks, key) is# -1
     return trea#core#mark_on(a:trea, a:node)
   endif
@@ -252,7 +255,7 @@ function! s:BufReadCmd() abort
   let trea = trea#core#get()
   let winid = win_getid()
   let cursor = get(b:, 'trea_cursor', getcurpos())
-  call trea#renderer#syntax()
+  call trea#internal#renderer#syntax()
   call trea#core#redraw(trea)
         \.then({ -> s:WindowCursor.set_cursor(winid, cursor[1:2]) })
         \.then({ -> trea#core#reload(trea, trea.root) })
@@ -261,7 +264,7 @@ endfunction
 
 function! s:ColorScheme() abort
   let trea = trea#core#get()
-  call trea#renderer#highlight()
+  call trea#internal#renderer#highlight()
 endfunction
 
 function! s:update_nodes(trea, nodes) abort
@@ -291,8 +294,18 @@ function! s:enter(trea, node) abort
     return s:Promise.reject('the node does not have bufname attribute')
   endif
   noautocmd execute printf('edit %s', a:node.bufname)
-  let provider = trea#proto#provider_new(a:node.bufname)
+  let uri = trea#uri(a:node.bufname)
+  let proto = trea#proto(uri)
+  let provider = trea#proto#{proto}#provider#new()
   return trea#core#init(uri, provider, {
         \ 'comparator': a:trea.comparator,
         \})
 endfunction
+
+
+augroup trea_core_internal
+  autocmd! *
+  autocmd User TreaInitPre :
+  autocmd User TreaInit :
+  autocmd User TreaReady :
+augroup END

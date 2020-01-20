@@ -7,7 +7,9 @@ function! s:BufReadCmd() abort
   if exists('b:trea')
     return
   endif
-  let provider = trea#proto#provider_new(expand('<afile>'))
+  let uri = trea#uri(expand('<afile>'))
+  let proto = trea#proto(uri)
+  let provider = trea#proto#{proto}#provider#new()
   call trea#core#init(uri, provider)
 endfunction
 

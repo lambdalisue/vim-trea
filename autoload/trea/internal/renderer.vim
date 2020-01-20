@@ -1,24 +1,24 @@
 let s:Config = vital#trea#import('Config')
 let s:AsyncLambda = vital#trea#import('Async.Lambda')
 
-let s:STATUS_NONE = g:trea#node#STATUS_NONE
-let s:STATUS_COLLAPSED = g:trea#node#STATUS_COLLAPSED
+let s:STATUS_NONE = g:trea#internal#node#STATUS_NONE
+let s:STATUS_COLLAPSED = g:trea#internal#node#STATUS_COLLAPSED
 
-function! trea#renderer#render(nodes, marks) abort
+function! trea#internal#renderer#render(nodes, marks) abort
   let options = {
-        \ 'leading': g:trea#renderer#leading,
-        \ 'root_symbol': g:trea#renderer#root_symbol,
-        \ 'leaf_symbol': g:trea#renderer#leaf_symbol,
-        \ 'expanded_symbol': g:trea#renderer#expanded_symbol,
-        \ 'collapsed_symbol': g:trea#renderer#collapsed_symbol,
-        \ 'marked_symbol': g:trea#renderer#marked_symbol,
-        \ 'unmarked_symbol': g:trea#renderer#unmarked_symbol,
+        \ 'leading': g:trea#internal#renderer#leading,
+        \ 'root_symbol': g:trea#internal#renderer#root_symbol,
+        \ 'leaf_symbol': g:trea#internal#renderer#leaf_symbol,
+        \ 'expanded_symbol': g:trea#internal#renderer#expanded_symbol,
+        \ 'collapsed_symbol': g:trea#internal#renderer#collapsed_symbol,
+        \ 'marked_symbol': g:trea#internal#renderer#marked_symbol,
+        \ 'unmarked_symbol': g:trea#internal#renderer#unmarked_symbol,
         \}
   let base = len(a:nodes[0].__key)
   return s:AsyncLambda.map(copy(a:nodes), { v, -> s:render_node(v, a:marks, base, options) })
 endfunction
 
-function! trea#renderer#syntax() abort
+function! trea#internal#renderer#syntax() abort
   syntax clear
   syntax match TreaRoot   /\%1l.*/
   syntax match TreaLeaf   /^\s*|  /
@@ -26,7 +26,7 @@ function! trea#renderer#syntax() abort
   syntax match TreaMarked /^* .*/
 endfunction
 
-function! trea#renderer#highlight() abort
+function! trea#internal#renderer#highlight() abort
   highlight default link TreaRoot   Directory
   highlight default link TreaLeaf   Directory
   highlight default link TreaBranch Directory

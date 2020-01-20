@@ -7,7 +7,7 @@ let s:STATUS_NONE = 0
 let s:STATUS_COLLAPSED = 1
 let s:STATUS_EXPANDED = 2
 
-function! trea#node#new(node, ...) abort
+function! trea#internal#node#new(node, ...) abort
   let label = get(a:node, 'label', a:node.name)
   let node = extend(a:node, {
         \ 'label': label,
@@ -20,7 +20,7 @@ function! trea#node#new(node, ...) abort
   return node
 endfunction
 
-function! trea#node#index(key, nodes) abort
+function! trea#internal#node#index(key, nodes) abort
   if type(a:key) isnot# v:t_list
     throw 'trea: "key" must be a list'
   endif
@@ -32,17 +32,17 @@ function! trea#node#index(key, nodes) abort
   return -1
 endfunction
 
-function! trea#node#find(key, nodes) abort
-  let index = trea#node#index(a:key, a:nodes)
+function! trea#internal#node#find(key, nodes) abort
+  let index = trea#internal#node#index(a:key, a:nodes)
   return index is# -1 ? v:null : a:nodes[index]
 endfunction
 
 " NOTE: Use node.__key directly when performance is the matter
-function! trea#node#key(node) abort
+function! trea#internal#node#key(node) abort
   return a:node.__key
 endfunction
 
-function! trea#node#parent(node, provider, token, ...) abort
+function! trea#internal#node#parent(node, provider, token, ...) abort
   let options = extend({
         \ 'cache': 1,
         \}, a:0 ? a:1 : {})
@@ -53,7 +53,7 @@ function! trea#node#parent(node, provider, token, ...) abort
   endif
   let a:node.__processing += 1
   let p = a:provider.get_parent(a:node, a:token)
-        \.then({ n -> trea#node#new(n, {
+        \.then({ n -> trea#internal#node#new(n, {
         \   '__key': [],
         \   '__owner': v:null,
         \ })
@@ -65,7 +65,7 @@ function! trea#node#parent(node, provider, token, ...) abort
   return p
 endfunction
 
-function! trea#node#children(node, provider, token, ...) abort
+function! trea#internal#node#children(node, provider, token, ...) abort
   let options = extend({
         \ 'cache': 1,
         \}, a:0 ? a:1 : {})
@@ -82,7 +82,7 @@ function! trea#node#children(node, provider, token, ...) abort
   let a:node.__processing += 1
   let p = a:provider.get_children(a:node, a:token)
         \.then(s:AsyncLambda.map_f({ n ->
-        \   trea#node#new(n, {
+        \   trea#internal#node#new(n, {
         \     '__key': a:node.__key + [n.name],
         \     '__owner': a:node,
         \   })
@@ -94,7 +94,7 @@ function! trea#node#children(node, provider, token, ...) abort
   return p
 endfunction
 
-function! trea#node#reload(node, nodes, provider, comparator, token) abort
+function! trea#internal#node#reload(node, nodes, provider, comparator, token) abort
   if a:node.status is# s:STATUS_NONE || a:node.status is# s:STATUS_COLLAPSED
     return s:Promise.resolve(copy(a:nodes))
   elseif has_key(a:node, '__expand_resolver')
@@ -113,7 +113,7 @@ function! trea#node#reload(node, nodes, provider, comparator, token) abort
   let descendants = inner
         \.then({v -> copy(v)})
         \.then(s:AsyncLambda.map_f({ v ->
-        \   trea#node#children(v, a:provider, a:token, { 'cache': 0 }).then({ children ->
+        \   trea#internal#node#children(v, a:provider, a:token, { 'cache': 0 }).then({ children ->
         \     s:Lambda.if(v.status is# s:STATUS_EXPANDED, { -> children }, { -> []})
         \   })
         \ }))
@@ -127,10 +127,10 @@ function! trea#node#reload(node, nodes, provider, comparator, token) abort
         \.finally({ -> s:Lambda.let(a:node, '__processing', a:node.__processing - 1) })
 endfunction
 
-function! trea#node#expand(node, nodes, provider, comparator, token) abort
+function! trea#internal#node#expand(node, nodes, provider, comparator, token) abort
   if a:node.status is# s:STATUS_NONE
     " To improve UX, reload owner instead
-    return trea#node#reload(
+    return trea#internal#node#reload(
           \ a:node.__owner,
           \ a:nodes,
           \ a:provider,
@@ -139,7 +139,7 @@ function! trea#node#expand(node, nodes, provider, comparator, token) abort
           \)
   elseif a:node.status is# s:STATUS_EXPANDED
     " To improve UX, reload instead
-    return trea#node#reload(
+    return trea#internal#node#reload(
           \ a:node,
           \ a:nodes,
           \ a:provider,
@@ -152,7 +152,7 @@ function! trea#node#expand(node, nodes, provider, comparator, token) abort
     return a:node.__collapse_resolver
   endif
   let a:node.__processing += 1
-  let p = trea#node#children(a:node, a:provider, a:token)
+  let p = trea#internal#node#children(a:node, a:provider, a:token)
         \.then({ v -> s:sort(v, a:comparator.compare) })
         \.then({ v -> s:extend(a:node.__key, a:nodes, v) })
         \.finally({ -> s:Lambda.let(a:node, '__processing', a:node.__processing - 1) })
@@ -162,10 +162,10 @@ function! trea#node#expand(node, nodes, provider, comparator, token) abort
   return p
 endfunction
 
-function! trea#node#collapse(node, nodes, provider, comparator, token) abort
+function! trea#internal#node#collapse(node, nodes, provider, comparator, token) abort
   if a:node.__owner is# v:null
     " To improve UX, root node should NOT be collapsed and reload instead.
-    return trea#node#reload(
+    return trea#internal#node#reload(
           \ a:node,
           \ a:nodes,
           \ a:provider,
@@ -174,7 +174,7 @@ function! trea#node#collapse(node, nodes, provider, comparator, token) abort
           \)
   elseif a:node.status isnot# s:STATUS_EXPANDED
     " To improve UX, collapse a owner node instead
-    return trea#node#collapse(
+    return trea#internal#node#collapse(
           \ a:node.__owner,
           \ a:nodes,
           \ a:provider,
@@ -199,7 +199,7 @@ function! trea#node#collapse(node, nodes, provider, comparator, token) abort
   return p
 endfunction
 
-function! trea#node#reveal(key, nodes, provider, comparator, token) abort
+function! trea#internal#node#reveal(key, nodes, provider, comparator, token) abort
   if a:key == a:nodes[0].__key
     return s:Promise.resolve(a:nodes)
   endif
@@ -222,19 +222,19 @@ function! s:sort(nodes, compare) abort
 endfunction
 
 function! s:extend(key, nodes, new_nodes) abort
-  let index = trea#node#index(a:key, a:nodes)
+  let index = trea#internal#node#index(a:key, a:nodes)
   return index is# -1 ? a:nodes : extend(a:nodes, a:new_nodes, index + 1)
 endfunction
 
 function! s:expand_recursively(keys, nodes, provider, comparator, token) abort
-  let node = trea#node#find(a:keys[-1], a:nodes)
+  let node = trea#internal#node#find(a:keys[-1], a:nodes)
   if node is# v:null
     return s:Promise.reject(printf(
           \ 'no node %s exists',
           \ a:keys[-1],
           \))
   endif
-  return trea#node#expand(node, a:nodes, a:provider, a:comparator, a:token)
+  return trea#internal#node#expand(node, a:nodes, a:provider, a:comparator, a:token)
         \.then({ v -> s:Lambda.pass(v, remove(a:keys, -1)) })
         \.then({ v -> s:Lambda.if(
         \   len(a:keys) > 1,
@@ -244,6 +244,6 @@ function! s:expand_recursively(keys, nodes, provider, comparator, token) abort
 endfunction
 
 
-let g:trea#node#STATUS_NONE = s:STATUS_NONE
-let g:trea#node#STATUS_COLLAPSED = s:STATUS_COLLAPSED
-let g:trea#node#STATUS_EXPANDED = s:STATUS_EXPANDED
+let g:trea#internal#node#STATUS_NONE = s:STATUS_NONE
+let g:trea#internal#node#STATUS_COLLAPSED = s:STATUS_COLLAPSED
+let g:trea#internal#node#STATUS_EXPANDED = s:STATUS_EXPANDED

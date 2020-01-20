@@ -1,7 +1,7 @@
 let s:Spinner = vital#trea#import('App.Spinner')
 let s:frames = s:Spinner.dots
 
-function! trea#spinner#start(bufnr) abort
+function! trea#internal#spinner#start(bufnr) abort
   if getbufvar(a:bufnr, 'trea_spinner_timer' , v:null) isnot# v:null
     return
   endif
