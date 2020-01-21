@@ -106,7 +106,7 @@ function! trea#core#cursor(winid, trea, key, ...) abort
         \}, a:0 ? a:1 : {})
   let index = trea#internal#node#index(a:key, a:trea.nodes)
   if index is# -1
-    if a:key != trea#internal#node#key(a:trea.root)
+    if a:key != a:trea.root.__key
       return trea#core#cursor(a:winid, a:trea, a:key[:-2], options)
     endif
     return s:Promise.reject(printf('a node %s does not exist', a:key))
@@ -194,7 +194,7 @@ function! trea#core#leave(trea) abort
 endfunction
 
 function! trea#core#mark_on(trea, node) abort
-  let key = trea#internal#node#key(a:node)
+  let key = a:node.__key
   if index(a:trea.marks, key) is# -1
     call add(a:trea.marks, key)
     return trea#core#redraw(a:trea)
@@ -203,7 +203,7 @@ function! trea#core#mark_on(trea, node) abort
 endfunction
 
 function! trea#core#mark_off(trea, node) abort
-  let key = trea#internal#node#key(a:node)
+  let key = a:node.__key
   let index = index(a:trea.marks, key)
   if index isnot# -1
     call remove(a:trea.marks, index)
@@ -213,7 +213,7 @@ function! trea#core#mark_off(trea, node) abort
 endfunction
 
 function! trea#core#mark_toggle(trea, node) abort
-  let key = trea#internal#node#key(a:node)
+  let key = a:node.__key
   if index(a:trea.marks, key) is# -1
     return trea#core#mark_on(a:trea, a:node)
   endif

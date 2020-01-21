@@ -37,11 +37,6 @@ function! trea#internal#node#find(key, nodes) abort
   return index is# -1 ? v:null : a:nodes[index]
 endfunction
 
-" NOTE: Use node.__key directly when performance is the matter
-function! trea#internal#node#key(node) abort
-  return a:node.__key
-endfunction
-
 function! trea#internal#node#parent(node, provider, token, ...) abort
   let options = extend({
         \ 'cache': 1,

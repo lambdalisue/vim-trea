@@ -110,7 +110,7 @@ function! s:map_expand(trea) abort
         \.then({ -> trea#core#cursor(
         \   winid,
         \   a:trea,
-        \   trea#internal#node#key(node),
+        \   node.__key,
         \   { 'previous': cursor, 'offset': 1 },
         \ )
         \})
@@ -127,7 +127,7 @@ function! s:map_collapse(trea) abort
         \.then({ -> trea#core#cursor(
         \   winid,
         \   a:trea,
-        \   trea#internal#node#key(node),
+        \   node.__key,
         \   { 'previous': cursor },
         \ )
         \})
@@ -137,7 +137,7 @@ function! s:map_reveal(trea) abort
   let node = trea#core#get_cursor_node(a:trea)
   let path = node is# v:null
         \ ? ''
-        \ : join(trea#internal#node#key(node), '/') . '/'
+        \ : join(node.__key, '/') . '/'
   call inputsave()
   try
     redraw
