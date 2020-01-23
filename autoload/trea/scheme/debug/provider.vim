@@ -1,6 +1,6 @@
 let s:Promise = vital#trea#import('Async.Promise')
 
-function! trea#proto#debug#provider#new(...) abort
+function! trea#scheme#debug#provider#new(...) abort
   let tree = a:0 ? a:1 : s:tree
   return {
         \ 'get_node' : funcref('s:provider_get_node', [tree]),
@@ -13,29 +13,29 @@ function! s:sleep(ms) abort
   return s:Promise.new({ resolve -> timer_start(a:ms, { -> resolve() }) })
 endfunction
 
-function! s:get_entry(tree, uri) abort
-  let key = matchstr(a:uri, 'debug:///\zs.*')
-  if !has_key(a:tree, key)
+function! s:get_entry(tree, key) abort
+  if !has_key(a:tree, a:key)
     return v:null
   endif
-  let entry = extend({'key': key}, a:tree[key])
+  let entry = extend({'key': a:key}, a:tree[a:key])
   return entry
 endfunction
 
-function! s:provider_get_node(tree, uri) abort
-  let entry = s:get_entry(a:tree, a:uri)
+function! s:provider_get_node(tree, url) abort
+  let url = matchstr(a:url, '^debug://\zs.*')
+  let entry = s:get_entry(a:tree, url)
   return {
         \ 'name': get(split(entry.key, '/'), -1, 'root'),
         \ 'status': has_key(entry, 'children'),
-        \ 'bufname': 'trea://debug:///' . a:uri,
-        \ '_uri': a:uri,
+        \ 'bufname': 'debug://' . url,
+        \ '_uri': url,
         \}
 endfunction
 
 function! s:provider_get_parent(tree, node, ...) abort
   let uri = matchstr(a:node._uri, '.*\ze/[^/]*$')
   try
-    let node = s:provider_get_node(a:tree, uri)
+    let node = s:provider_get_node(a:tree, 'debug://' . uri)
     return s:Promise.resolve(node)
   catch
     return s:Promise.reject(v:exception)
@@ -51,7 +51,7 @@ function! s:provider_get_children(tree, node, ...) abort
   let base = split(uri, '/')
   let children = s:Promise.all(map(
         \ copy(entry.children),
-        \ { -> s:Promise.resolve(s:provider_get_node(a:tree, join(base + [v:val], '/'))) },
+        \ { -> s:Promise.resolve(s:provider_get_node(a:tree, 'debug://' . join(base + [v:val], '/'))) },
         \))
   return s:sleep(get(entry, 'delay', 0)).then({ -> children })
 endfunction

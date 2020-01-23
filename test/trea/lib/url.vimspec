@@ -1,0 +1,69 @@
+Describe trea#lib#url
+  Describe #parse()
+    It parses a string URL and return an URL object
+      let cases = [
+            \ ['file:///foo/bar.txt', {
+            \   'scheme': 'file',
+            \   'authority': '',
+            \   'path': '/foo/bar.txt',
+            \   'query': {},
+            \   'fragment': '',
+            \ }],
+            \ ['file:///foo/bar.txt#fragment', {
+            \   'scheme': 'file',
+            \   'authority': '',
+            \   'path': '/foo/bar.txt',
+            \   'query': {},
+            \   'fragment': 'fragment',
+            \ }],
+            \ ['file:///foo/bar.txt?drawer', {
+            \   'scheme': 'file',
+            \   'authority': '',
+            \   'path': '/foo/bar.txt',
+            \   'query': {'drawer': v:true},
+            \   'fragment': '',
+            \ }],
+            \ ['file:///foo/bar.txt?drawer=1', {
+            \   'scheme': 'file',
+            \   'authority': '',
+            \   'path': '/foo/bar.txt',
+            \   'query': {'drawer': '1'},
+            \   'fragment': '',
+            \ }],
+            \ ['file:///foo/bar.txt?drawer=', {
+            \   'scheme': 'file',
+            \   'authority': '',
+            \   'path': '/foo/bar.txt',
+            \   'query': {'drawer': ''},
+            \   'fragment': '',
+            \ }],
+            \ ['file:///foo/bar.txt?drawer#fragment', {
+            \   'scheme': 'file',
+            \   'authority': '',
+            \   'path': '/foo/bar.txt',
+            \   'query': {'drawer': v:true},
+            \   'fragment': 'fragment',
+            \ }],
+            \ ['ssh://john.doe@www.example.com:123/foo/bar.txt?drawer#fragment', {
+            \   'scheme': 'ssh',
+            \   'authority': 'john.doe@www.example.com:123',
+            \   'path': '/foo/bar.txt',
+            \   'query': {'drawer': v:true},
+            \   'fragment': 'fragment',
+            \ }],
+            \ ['mailto:john.doe@example.com', {
+            \   'scheme': 'mailto',
+            \   'authority': '',
+            \   'path': 'john.doe@example.com',
+            \   'query': {},
+            \   'fragment': '',
+            \ }],
+            \]
+      for case in cases
+        let url = case[0]
+        let exp = case[1]
+        Assert Equals(trea#lib#url#parse(url), exp)
+      endfor
+    End
+  End
+End

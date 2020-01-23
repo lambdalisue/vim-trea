@@ -7,19 +7,19 @@ function! s:BufReadCmd() abort
   if exists('b:trea')
     return
   endif
-  let uri = trea#uri(expand('<afile>'))
-  let proto = trea#proto(uri)
-  let provider = trea#proto#{proto}#provider#new()
-  call trea#core#init(uri, provider)
+  let bufname = bufname('%')
+  if bufname !~# '#[a-f0-9]\+$'
+    let bufname = printf("%s#%s", bufname, sha256(localtime())[:7])
+    execute printf(
+          \ "silent keepalt file %s",
+          \ fnameescape(bufname),
+          \)
+  endif
+  call trea#viewer#init()
+        \.catch({ e -> trea#lib#message#error(e) })
 endfunction
 
-augroup trea_entry
+augroup trea_plugin
   autocmd! *
-  autocmd BufReadCmd trea://* call s:BufReadCmd()
+  autocmd BufReadCmd trea:*/* call s:BufReadCmd()
 augroup END
-
-function! s:trea_test() abort
-  vertical new trea://file:///Users/alisue/
-endfunction
-
-command! -nargs=* -complete=dir TreaTest call s:trea_test()

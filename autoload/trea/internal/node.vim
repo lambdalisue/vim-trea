@@ -117,8 +117,8 @@ function! trea#internal#node#reload(node, nodes, provider, comparator, token) ab
   let a:node.__processing += 1
   return s:Promise.all([outer, inner, descendants])
         \.then(s:AsyncLambda.reduce_f({ a, v -> a + v }, []))
-        \.then({ v -> s:uniq(v) })
         \.then({ v -> s:sort(v, a:comparator.compare) })
+        \.then({ v -> s:uniq(v) })
         \.finally({ -> s:Lambda.let(a:node, '__processing', a:node.__processing - 1) })
 endfunction
 
@@ -209,7 +209,7 @@ function! trea#internal#node#reveal(key, nodes, provider, comparator, token) abo
 endfunction
 
 function! s:uniq(nodes) abort
-  return s:Promise.resolve(uniq(a:nodes, { a, b -> a.__key !=  b.__key }))
+  return s:Promise.resolve(uniq(a:nodes, { a, b -> a.__key != b.__key }))
 endfunction
 
 function! s:sort(nodes, compare) abort

@@ -5,7 +5,7 @@ let s:Promise = vital#trea#import('Async.Promise')
 let s:Process = vital#trea#import('Async.Promise.Process')
 let s:CancellationToken = vital#trea#import('Async.CancellationToken')
 
-function! trea#proto#file#provider#new() abort
+function! trea#scheme#file#provider#new() abort
   return {
         \ 'get_node': funcref('s:provider_get_node'),
         \ 'get_parent' : funcref('s:provider_get_parent'),
@@ -13,8 +13,8 @@ function! trea#proto#file#provider#new() abort
         \}
 endfunction
 
-function! s:provider_get_node(uri) abort
- return s:node(matchstr(a:uri, 'file://\zs.*'))
+function! s:provider_get_node(url) abort
+ return s:node(a:url)
 endfunction
 
 function! s:provider_get_parent(node, ...) abort
@@ -22,7 +22,7 @@ function! s:provider_get_parent(node, ...) abort
     return s:Promise.reject("no parent node exists for the root")
   endif
   let parent = fnamemodify(a:node._path, ':h')
-  return s:Promise.resolve(s:node(parent))
+  return s:node(parent)
 endfunction
 
 function! s:provider_get_children(node, ...) abort
@@ -31,7 +31,9 @@ function! s:provider_get_children(node, ...) abort
     return s:Promise.reject("no children exists for %s", a:node._path)
   endif
   return s:children(a:node._path, token)
-        \.then(s:AsyncLambda.map_f({ v -> s:node(v) }))
+        \.then(s:AsyncLambda.map_f({ v -> s:node(v).catch({ -> v:null }) }))
+        \.then({ ns -> s:Promise.all(ns) })
+        \.then(s:AsyncLambda.filter_f({ v -> !empty(v) }))
 endfunction
 
 function! s:norm(path) abort
@@ -43,21 +45,21 @@ function! s:norm(path) abort
   return abspath
 endfunction
 
-function! s:node(path) abort
-  let path = s:norm(a:path)
+function! s:node(url) abort
+  let path = s:norm(matchstr(a:url, '^\%(file://\)\?\zs.*'))
+  if empty(getftype(path))
+    return s:Promise.reject("no such file or directory exists")
+  endif
   let name = fnamemodify(path, ':t')
   let status = isdirectory(path)
-  let bufname = status is# 1
-        \ ? printf('trea://file://%s', path)
-        \ : path
-  return {
+  return s:Promise.resolve({
         \ 'name': name,
         \ 'label': name ==# '' ? '/' : name,
         \ 'status': status,
         \ 'hidden': name[:0] ==# '.',
-        \ 'bufname': bufname,
+        \ 'bufname': 'file://' . path,
         \ '_path': path,
-        \}
+        \})
 endfunction
 
 if executable('find')
@@ -89,11 +91,10 @@ function! s:children_vim(path, ...) abort
 endfunction
 
 function! s:children(path, token) abort
-  return call(printf('s:children_%s', g:trea#proto#file#provider#impl), [a:path, a:token])
+  return call(printf('s:children_%s', g:trea#scheme#file#provider#impl), [a:path, a:token])
 endfunction
 
 
 call s:Config.config(expand('<sfile>:p'), {
       \ 'impl': executable('find') ? 'find' : executable('ls') ? 'ls' : 'vim',
       \})
-

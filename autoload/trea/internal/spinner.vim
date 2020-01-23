@@ -1,23 +1,24 @@
 let s:Spinner = vital#trea#import('App.Spinner')
 let s:frames = s:Spinner.dots
 
-function! trea#internal#spinner#start(bufnr) abort
-  if getbufvar(a:bufnr, 'trea_spinner_timer' , v:null) isnot# v:null
+function! trea#internal#spinner#start(...) abort
+  let bufnr = a:0 ? a:1 : bufnr('%')
+  if getbufvar(bufnr, 'trea_spinner_timer' , v:null) isnot# v:null
     return
   endif
   let spinner = s:Spinner.new(map(
         \ copy(s:frames),
         \ { k -> printf('TreaSignSpinner%d', k) },
         \))
-  call setbufvar(a:bufnr, 'trea_spinner_timer', timer_start(
+  call setbufvar(bufnr, 'trea_spinner_timer', timer_start(
         \ 50,
-        \ { t -> s:update(t, spinner, a:bufnr) },
+        \ { t -> s:update(t, spinner, bufnr) },
         \ { 'repeat': -1 },
         \))
 endfunction
 
 function! s:update(timer, spinner, bufnr) abort
-  let trea = trea#core#get(a:bufnr)
+  let trea = getbufvar(a:bufnr, 'trea', v:null)
   let winid = bufwinid(a:bufnr)
   if trea is# v:null || winid is# -1
     call timer_stop(a:timer)
